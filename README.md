@@ -15,7 +15,6 @@
   <a href="#usage">Usage</a> •
   <a href="#configuration">Configuration</a> •
   <a href="#troubleshooting">Troubleshooting</a> •
-  <a href="#development">Development</a> •
   <a href="#license">License</a>
 </p>
 
@@ -138,3 +137,33 @@ Recon can be configured through VS Code settings:
 - **Fuzzer not found**: Ensure Echidna/Medusa are installed and in your PATH
 - **Compilation errors**: Run `forge build` manually to identify issues
 - **No contracts showing**: Check if out/ directory exists with compiled contracts
+
+## License
+
+Recon is released under the MIT License.
+
+```
+MIT License
+
+Copyright (c) 2023-2024 Recon-Fuzz Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+This extension is provided as-is, and contributions are welcome through our [GitHub repository](https://github.com/Recon-Fuzz/recon-extension).
