@@ -1,0 +1,303 @@
+{
+  "name": "recon",
+  "displayName": "Recon",
+  "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
+  "version": "0.0.12",
+  "license": "MIT",
+  "publisher": "Recon-Fuzz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Recon-Fuzz/recon-extension.git"
+  },
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:foundry.toml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "recon-cockpit",
+          "title": "Recon",
+          "icon": "images/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "recon-cockpit": [
+        {
+          "type": "webview",
+          "id": "recon-contracts",
+          "name": "Contracts"
+        },
+        {
+          "type": "webview",
+          "id": "recon-main",
+          "name": "Recon Cockpit"
+        },
+        {
+          "type": "webview",
+          "id": "recon-coverage",
+          "name": "Coverage Reports"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "recon.clone",
+          "when": "view == recon-c4-ongoing",
+          "group": "inline"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "recon.showAllFiles",
+          "when": "view == recon-contracts && !recon.showingAllFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "recon.hideAllFiles",
+          "when": "view == recon-contracts && recon.showingAllFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "recon.refreshCoverage",
+          "when": "view == recon-coverage",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "recon.generateMock",
+          "when": "resourceExtname == .json || resourceExtname == .sol",
+          "group": "2_workspace"
+        },
+        {
+          "command": "recon.cleanupCoverageReport",
+          "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/)",
+          "group": "2_workspace"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "recon.helloWorld",
+        "title": "Hello World"
+      },
+      {
+        "command": "recon.clone",
+        "title": "Clone",
+        "icon": "images/icon.png"
+      },
+      {
+        "command": "recon.installChimera",
+        "title": "Install Chimera",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "recon.toggleContract",
+        "title": "Toggle Contract",
+        "icon": "$(check)"
+      },
+      {
+        "command": "recon.toggleFunction",
+        "title": "Toggle Function",
+        "icon": "$(check)"
+      },
+      {
+        "command": "recon.showAllFiles",
+        "title": "Show All Files",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "recon.hideAllFiles",
+        "title": "Hide Test & Library Files",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "recon.buildProject",
+        "title": "Forge Build",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.runEchidna",
+        "title": "Run Echidna",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.runMedusa",
+        "title": "Run Medusa",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.runTest",
+        "title": "Run Solidity Test",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.debugTest",
+        "title": "Debug Solidity Test",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.setFunctionMode",
+        "title": "Set Function Mode",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.setFunctionActor",
+        "title": "Set Function Actor",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.generateMock",
+        "title": "Generate Solidity Mock",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.cleanupCoverageReport",
+        "title": "Clean up Coverage Report",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.refreshCoverage",
+        "title": "Refresh Coverage",
+        "icon": "$(refresh)"
+      }
+    ],
+    "configuration": {
+      "title": "Recon",
+      "properties": {
+        "recon.defaultFuzzer": {
+          "type": "string",
+          "default": "Echidna",
+          "enum": [
+            "Echidna",
+            "Medusa"
+          ],
+          "description": "Default fuzzing tool to use",
+          "order": 1
+        },
+        "recon.showAllFiles": {
+          "type": "boolean",
+          "default": false,
+          "order": 2,
+          "description": "Show all contract files including tests and libraries"
+        },
+        "recon.echidna.mode": {
+          "type": "string",
+          "order": 3,
+          "default": "assertion",
+          "enum": [
+            "property",
+            "assertion",
+            "optimization",
+            "overflow",
+            "exploration"
+          ],
+          "description": "Execution mode for Echidna"
+        },
+        "recon.echidna.testLimit": {
+          "type": "number",
+          "default": 1000000,
+          "minimum": 1,
+          "order": 4,
+          "description": "Test limit for Echidna fuzzing"
+        },
+        "recon.echidna.workers": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "order": 5,
+          "description": "Number of workers for Echidna fuzzing"
+        },
+        "recon.medusa.testLimit": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "order": 6,
+          "description": "Test limit for Medusa fuzzing"
+        },
+        "recon.medusa.workers": {
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "order": 7,
+          "description": "Number of workers for Medusa fuzzing"
+        },
+        "recon.foundryConfigPath": {
+          "type": "string",
+          "default": "foundry.toml",
+          "description": "Path to foundry.toml configuration file (relative to workspace root)",
+          "order": 8
+        },
+        "recon.forge.buildArgs": {
+          "type": "string",
+          "default": "",
+          "description": "Extra arguments to pass to forge build command (e.g. --via-ir)",
+          "order": 1
+        },
+        "recon.forge.testVerbosity": {
+          "type": "string",
+          "default": "-vvv",
+          "enum": [
+            "-v",
+            "-vv",
+            "-vvv",
+            "-vvvv",
+            "-vvvvv"
+          ],
+          "description": "Verbosity level for forge test command",
+          "order": 2
+        },
+        "recon.mocksFolderPath": {
+          "type": "string",
+          "default": "test/recon/mocks",
+          "description": "Path to store generated mock contracts (relative to foundry.toml location)",
+          "order": 11
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "yarn run compile && yarn run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "package": "vsce package",
+    "prepare": "yarn run compile"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.88.0",
+    "@typescript-eslint/eslint-plugin": "^8.22.0",
+    "@typescript-eslint/parser": "^8.22.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.19.0",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@recon-fuzz/log-parser-experimental": "^0.0.25",
+    "@solidity-parser/parser": "^0.19.0",
+    "@vscode/codicons": "^0.0.36",
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "abi-to-mock": "^1.0.7",
+    "case": "^1.6.3",
+    "handlebars": "^4.7.8",
+    "jsdom": "^26.0.0",
+    "yaml": "^2.7.0"
+  }
+}
