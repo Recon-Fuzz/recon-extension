@@ -7,7 +7,6 @@ import { CoverageViewProvider } from './coverageView';
 import { SolFileProcessor } from './solFileProcessor';
 import { OutputService } from './services/outputService';
 import { ContractWatcherService } from './services/contractWatcherService';
-import { ProcessRunnerService } from './services/processRunnerService';
 import { WorkspaceService } from './services/workspaceService';
 import * as fs from 'fs/promises';
 import { getFoundryConfigPath, outputDirectoryExist } from './utils';
@@ -16,7 +15,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // Create services
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
-    const processRunnerService = new ProcessRunnerService();
     const workspaceService = new WorkspaceService();
     
     // Create view providers
@@ -53,7 +51,6 @@ export async function activate(context: vscode.ExtensionContext) {
         reconContractsProvider,
         coverageViewProvider,
         contractWatcherService,
-        processRunnerService,
         workspaceService
     });
 

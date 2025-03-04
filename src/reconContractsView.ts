@@ -11,6 +11,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
     private collapsedContracts = new Set<string>();
     private saveStateTimeout: NodeJS.Timeout | null = null;
     private isStateSaving = false;
+    private searchQuery: string = '';
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -182,6 +183,10 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         this.showAllFiles = message.value;
                         this._updateWebview();
                         break;
+                    case 'updateSearch':
+                        this.searchQuery = message.query;
+                        // Don't update the entire webview, let the client-side filter handle it
+                        break;
                     case 'toggleContract':
                         const contract = this.contracts.find(c => c.name === message.contractName);
                         if (contract) {
@@ -221,6 +226,12 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 );
                             }
                             this.saveState();
+                            
+                            // Return updated contract data without rerendering everything
+                            if (message.clientUpdate) {
+                                // We let client handle the UI update
+                                return;
+                            }
                         }
                         break;
                     case 'toggleCollapse':
@@ -229,7 +240,16 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         } else {
                             this.collapsedContracts.add(message.contractName);
                         }
-                        this._updateWebview();
+                        
+                        // Only update the collapsed state without full rerender
+                        if (this._view) {
+                            this._view.webview.postMessage({
+                                type: 'updatedCollapsedState', 
+                                contractName: message.contractName, 
+                                collapsed: this.collapsedContracts.has(message.contractName)
+                            });
+                            return;
+                        }
                         break;
                     case 'updateFunctionMode':
                     case 'updateFunctionActor':
@@ -254,6 +274,18 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             }
                             // Only save state, don't update webview
                             this.saveState();
+                            
+                            // Only notify the client that the update was successful
+                            if (message.clientUpdate && this._view) {
+                                this._view.webview.postMessage({
+                                    type: 'updateSuccess',
+                                    contractName: message.contractName,
+                                    functionName: message.functionName,
+                                    property: message.type === 'updateFunctionMode' ? 'mode' : 'actor',
+                                    value: message.type === 'updateFunctionMode' ? message.mode : message.actor
+                                });
+                                return;
+                            }
                         }
                         break;
                     case 'openFile':
@@ -270,6 +302,57 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         if (contract4) {
                             contract4.separated = message.separated;
                             await this.saveState();
+                            
+                            // Only notify the client that the update was successful
+                            if (message.clientUpdate && this._view) {
+                                this._view.webview.postMessage({
+                                    type: 'updateSuccess',
+                                    contractName: message.contractName,
+                                    property: 'separated',
+                                    value: message.separated
+                                });
+                                return;
+                            }
+                        }
+                        break;
+                    case 'getContractState':
+                        // Send the current state of a specific contract to the client
+                        if (this._view) {
+                            const contract = this.contracts.find(c => c.name === message.contractName);
+                            if (contract) {
+                                this._view.webview.postMessage({
+                                    type: 'contractState',
+                                    contract: {
+                                        name: contract.name,
+                                        enabled: contract.enabled,
+                                        path: contract.path,
+                                        separated: contract.separated,
+                                        enabledFunctions: contract.enabledFunctions || [],
+                                        functionConfigs: contract.functionConfigs || []
+                                    }
+                                });
+                            }
+                        }
+                        break;
+                    case 'batchUpdateFunctions':
+                        const contract5 = this.contracts.find(c => c.name === message.contractName);
+                        if (contract5) {
+                            // Update multiple functions at once
+                            if (message.enabledFunctions) {
+                                contract5.enabledFunctions = [...message.enabledFunctions];
+                            }
+                            if (message.functionConfigs) {
+                                contract5.functionConfigs = [...message.functionConfigs];
+                            }
+                            await this.saveState();
+                            
+                            if (message.clientUpdate && this._view) {
+                                this._view.webview.postMessage({
+                                    type: 'batchUpdateSuccess',
+                                    contractName: message.contractName
+                                });
+                                return;
+                            }
                         }
                         break;
                 }
@@ -297,6 +380,20 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             contract.enabledFunctions = [];
         }
         await this.saveState();
+        
+        // Send targeted update to webview instead of full refresh
+        if (this._view) {
+            this._view.webview.postMessage({
+                type: 'contractToggled',
+                contractName: contract.name,
+                enabled: contract.enabled,
+                enabledFunctions: contract.enabledFunctions,
+                functionConfigs: contract.functionConfigs
+            });
+            return;
+        }
+        
+        // Fall back to full refresh if targeted update fails
         this._updateWebview();
     }
 
@@ -323,20 +420,26 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         font-family: var(--vscode-font-family);
                         font-size: var(--vscode-font-size);
                     }
-                    .select-all-container {
+                    .search-container {
                         position: sticky;
                         top: 0;
                         background: var(--vscode-sideBar-background);
                         border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
-                        padding: 4px 8px;
+                        padding: 8px;
                         z-index: 10;
+                        display: flex;
+                        align-items: center;
                     }
-                    .select-all {
-                        font-size: 11px;
-                        text-transform: uppercase;
-                        font-weight: 600;
-                        opacity: 0.8;
-                        letter-spacing: 0.04em;
+                    .search-container vscode-text-field {
+                        width: 100%;
+                    }
+                    .search-container vscode-text-field::part(control) {
+                        width: 100%;
+                    }
+                    .search-icon {
+                        position: absolute;
+                        right: 10px;
+                        opacity: 0.6;
                     }
                     #contracts-list {
                        
@@ -492,25 +595,410 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         margin-left: 8px;
                         opacity: 0.8;
                     }
+                    .no-results {
+                        padding: 16px;
+                        text-align: center;
+                        color: var(--vscode-descriptionForeground);
+                        font-style: italic;
+                    }
+                    .highlight {
+                        color: var(--vscode-textLink-foreground);
+                        font-weight: bold;
+                    }
+                    .hidden {
+                        display: none !important;
+                    }
+                    .batch-actions {
+                        padding: 4px;
+                        margin-top: 8px;
+                        display: flex;
+                        gap: 4px;
+                    }
+                    .batch-actions vscode-button {
+                        flex: 1;
+                    }
+                    /* Add virtual list support */
+                    .virtual-list-container {
+                        will-change: transform;
+                    }
+                    .collapsible-section {
+                        overflow: hidden;
+                        transition: max-height 0.2s ease-out;
+                    }
+                    /* Optimize performance for function settings */
+                    .optimized-radio {
+                        display: inline-block;
+                        margin-right: 8px;
+                    }
+                    .radio-label {
+                        cursor: pointer;
+                        padding: 3px 6px;
+                        border-radius: 3px;
+                        border: 1px solid var(--vscode-button-border);
+                        font-size: 10px;
+                        user-select: none;
+                    }
+                    .radio-label.selected {
+                        background-color: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                    }
+                    /* Loading indication */
+                    .saving-indicator {
+                        position: absolute;
+                        bottom: 4px;
+                        right: 4px;
+                        font-size: 10px;
+                        color: var(--vscode-descriptionForeground);
+                        background: var(--vscode-editor-background);
+                        padding: 2px 4px;
+                        border-radius: 3px;
+                        opacity: 0;
+                        transition: opacity 0.2s;
+                    }
+                    .saving-indicator.visible {
+                        opacity: 1;
+                    }
+                    .select-all-container {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-bottom: 4px;
+                    }
+                    /* Optimize radio buttons for better interaction */
+                    .optimized-radio-group {
+                        display: flex;
+                        gap: 2px;
+                        margin: 4px 0;
+                    }
                 </style>
             </head>
             <body class="webview-body">
-                <div class="select-all-container">
-                    <vscode-checkbox 
-                        class="select-all" 
-                        onchange="toggleAllContracts(this.checked)"
-                        ${this.areAllContractsSelected() ? 'checked' : ''}
+                <div class="search-container">
+                    <vscode-text-field
+                        id="search-input"
+                        placeholder="Search contracts"
+                        value="${this.searchQuery}"
+                        oninput="filterContracts(this.value)"
+                        iconEnd="vscode-icons:file-search"
                     >
-                        Select All Contracts
-                    </vscode-checkbox>
+                    </vscode-text-field>
+                    <i class="codicon codicon-search search-icon"></i>
                 </div>
                 <div id="contracts-list" class="contracts-container">
                     ${this.getContractsHtml()}
                 </div>
+                <div id="no-results" class="no-results hidden">
+                    No contracts found matching "<span id="search-term"></span>"
+                </div>
+                <div id="saving-indicator" class="saving-indicator">Saving...</div>
                 <script>
                     const vscode = acquireVsCodeApi();
                     
+                    // Store any state that will be needed between reloads
+                    const state = vscode.getState() || { 
+                        searchQuery: "${this.searchQuery}",
+                        activeElement: null,
+                        contractStates: {},
+                        pendingUpdates: {},
+                        isSaving: false
+                    };
+                    
+                    // Set up observer to restore focus
+                    const observer = new MutationObserver((mutationsList, observer) => {
+                        const searchInput = document.getElementById('search-input');
+                        if (document.activeElement !== searchInput && state.activeElement === 'search-input') {
+                            searchInput.focus();
+                            // Position cursor at the end of text
+                            if (searchInput.value) {
+                                setTimeout(() => {
+                                    searchInput.setSelectionRange(
+                                        searchInput.value.length,
+                                        searchInput.value.length
+                                    );
+                                }, 0);
+                            }
+                        }
+                    });
+                    
+                    observer.observe(document.body, { childList: true, subtree: true });
+
+                    // Handle focus tracking
+                    document.getElementById('search-input').addEventListener('focus', () => {
+                        state.activeElement = 'search-input';
+                        vscode.setState(state);
+                    });
+
+                    document.getElementById('search-input').addEventListener('blur', () => {
+                        state.activeElement = null;
+                        vscode.setState(state);
+                    });
+                    
+                    // Listen for messages from the extension
+                    window.addEventListener('message', event => {
+                        const message = event.data;
+                        switch (message.type) {
+                            case 'updatedCollapsedState':
+                                updateCollapsedState(message.contractName, message.collapsed);
+                                break;
+                            case 'contractToggled':
+                                updateContractState(message.contractName, message.enabled, message.enabledFunctions, message.functionConfigs);
+                                break;
+                            case 'updateSuccess':
+                                handleUpdateSuccess(message);
+                                break;
+                            case 'contractState':
+                                updateContractStateFromServer(message.contract);
+                                break;
+                            case 'batchUpdateSuccess':
+                                hideSavingIndicator();
+                                break;
+                        }
+                    });
+
+                    // Handle successful update response
+                    function handleUpdateSuccess(message) {
+                        // Update client-side state
+                        if (!state.contractStates[message.contractName]) {
+                            state.contractStates[message.contractName] = {};
+                        }
+                        
+                        if (message.functionName) {
+                            // Update function-specific property
+                            const functionConfig = state.contractStates[message.contractName].functionConfigs?.find(
+                                f => f.signature === message.functionName
+                            );
+                            if (functionConfig) {
+                                functionConfig[message.property] = message.value;
+                            }
+                        } else {
+                            // Update contract-level property
+                            state.contractStates[message.contractName][message.property] = message.value;
+                        }
+                        
+                        vscode.setState(state);
+                        hideSavingIndicator();
+                    }
+
+                    // Show saving indicator for async operations
+                    function showSavingIndicator() {
+                        const indicator = document.getElementById('saving-indicator');
+                        indicator.classList.add('visible');
+                        state.isSaving = true;
+                        vscode.setState(state);
+                    }
+
+                    // Hide saving indicator when complete
+                    function hideSavingIndicator() {
+                        const indicator = document.getElementById('saving-indicator');
+                        indicator.classList.remove('visible');
+                        state.isSaving = false;
+                        vscode.setState(state);
+                    }
+
+                    // Cache contract states for client-side rendering
+                    function updateContractStateFromServer(contract) {
+                        state.contractStates[contract.name] = contract;
+                        vscode.setState(state);
+                    }
+
+                    // Update contract state in UI without full rerender
+                    function updateContractState(contractName, enabled, enabledFunctions, functionConfigs) {
+                        const contractDiv = document.querySelector(\`[data-contract="\${contractName}"]\`);
+                        if (!contractDiv) return;
+                        
+                        // Update checkbox state
+                        const checkbox = contractDiv.querySelector(\`#contract-\${contractName}\`);
+                        if (checkbox) checkbox.checked = enabled;
+                        
+                        // Update functions list visibility
+                        const functionsList = contractDiv.querySelector('.functions-list');
+                        if (enabled) {
+                            if (functionsList) {
+                                // Render functions if contract is now enabled
+                                renderFunctions(contractName, enabledFunctions, functionConfigs);
+                                
+                                // Show separated checkbox if needed
+                                const separatedCheckboxContainer = contractDiv.querySelector('.contract-separated-checkbox');
+                                if (!separatedCheckboxContainer) {
+                                    const titleDiv = contractDiv.querySelector('.contract-title');
+                                    const separatedCheckbox = document.createElement('vscode-checkbox');
+                                    separatedCheckbox.className = 'contract-separated-checkbox';
+                                    separatedCheckbox.id = \`contract-separated-\${contractName}\`;
+                                    separatedCheckbox.checked = true; // Default to true
+                                    separatedCheckbox.innerHTML = 'Separated';
+                                    separatedCheckbox.setAttribute('onchange', \`toggleContractSeparated('\${contractName}', this.checked, true)\`);
+                                    titleDiv.appendChild(separatedCheckbox);
+                                }
+                            }
+                        } else {
+                            // Clear functions if contract is disabled
+                            if (functionsList) {
+                                functionsList.innerHTML = '';
+                            }
+                            // Remove separated checkbox
+                            const separatedCheckbox = contractDiv.querySelector(\`#contract-separated-\${contractName}\`);
+                            if (separatedCheckbox) {
+                                const parent = separatedCheckbox.parentElement;
+                                parent.removeChild(parent.querySelector('.contract-separated-checkbox'));
+                            }
+                        }
+                        
+                        // Update local state
+                        if (!state.contractStates[contractName]) {
+                            state.contractStates[contractName] = {};
+                        }
+                        state.contractStates[contractName].enabled = enabled;
+                        state.contractStates[contractName].enabledFunctions = enabledFunctions;
+                        state.contractStates[contractName].functionConfigs = functionConfigs;
+                        vscode.setState(state);
+                    }
+                    
+                    // Render or re-render functions for a contract
+                    function renderFunctions(contractName, enabledFunctions, functionConfigs) {
+                        const functionsList = document.querySelector(\`[data-contract="\${contractName}"] .functions-list\`);
+                        if (!functionsList) return;
+                        
+                        // Get all function checkboxes and their data
+                        const functionItems = functionsList.querySelectorAll('.function-item');
+                        const functions = Array.from(functionItems).map(item => {
+                            const checkbox = item.querySelector('.function-checkbox');
+                            return {
+                                signature: checkbox.dataset.function,
+                                element: item
+                            };
+                        });
+                        
+                        // Update each function's enabled state and settings
+                        functions.forEach(fn => {
+                            const isEnabled = enabledFunctions && enabledFunctions.includes(fn.signature);
+                            const checkbox = fn.element.querySelector('.function-checkbox');
+                            if (checkbox) checkbox.checked = isEnabled;
+                            
+                            const config = functionConfigs && functionConfigs.find(c => c.signature === fn.signature);
+                            if (isEnabled && config) {
+                                // Update or create settings if enabled
+                                let contentDiv = fn.element.querySelector('.function-content');
+                                if (!contentDiv) {
+                                    contentDiv = document.createElement('div');
+                                    contentDiv.className = 'function-content';
+                                    contentDiv.innerHTML = \`
+                                        <div class="function-settings">
+                                            <div class="optimized-radio-group" data-type="mode">
+                                                <span class="optimized-radio">
+                                                    <label class="radio-label \${config.mode === 'normal' ? 'selected' : ''}" 
+                                                           data-value="normal" 
+                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'mode', 'normal', this)">
+                                                        Normal
+                                                    </label>
+                                                </span>
+                                                <span class="optimized-radio">
+                                                    <label class="radio-label \${config.mode === 'fail' ? 'selected' : ''}" 
+                                                           data-value="fail" 
+                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'mode', 'fail', this)">
+                                                        Fail
+                                                    </label>
+                                                </span>
+                                                <span class="optimized-radio">
+                                                    <label class="radio-label \${config.mode === 'catch' ? 'selected' : ''}" 
+                                                           data-value="catch" 
+                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'mode', 'catch', this)">
+                                                        Catch
+                                                    </label>
+                                                </span>
+                                            </div>
+                                            <div class="optimized-radio-group" data-type="actor">
+                                                <span class="optimized-radio">
+                                                    <label class="radio-label \${config.actor === 'actor' ? 'selected' : ''}" 
+                                                           data-value="actor" 
+                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'actor', 'actor', this)">
+                                                        Actor
+                                                    </label>
+                                                </span>
+                                                <span class="optimized-radio">
+                                                    <label class="radio-label \${config.actor === 'admin' ? 'selected' : ''}" 
+                                                           data-value="admin" 
+                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'actor', 'admin', this)">
+                                                        Admin
+                                                    </label>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    \`;
+                                    fn.element.appendChild(contentDiv);
+                                } else {
+                                    // Update existing settings
+                                    updateRadioLabels(contentDiv.querySelector('[data-type="mode"]'), config.mode);
+                                    updateRadioLabels(contentDiv.querySelector('[data-type="actor"]'), config.actor);
+                                }
+                            } else {
+                                // Remove settings if disabled
+                                const contentDiv = fn.element.querySelector('.function-content');
+                                if (contentDiv) {
+                                    fn.element.removeChild(contentDiv);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Update selected radio label in a group
+                    function updateRadioLabels(container, selectedValue) {
+                        if (!container) return;
+                        const labels = container.querySelectorAll('.radio-label');
+                        labels.forEach(label => {
+                            if (label.dataset.value === selectedValue) {
+                                label.classList.add('selected');
+                            } else {
+                                label.classList.remove('selected');
+                            }
+                        });
+                    }
+                    
+                    // Update function setting with optimized radio buttons
+                    function updateFunctionSetting(contractName, functionName, settingType, value, element) {
+                        // Show saving indicator
+                        showSavingIndicator();
+                        
+                        // Update UI immediately
+                        const container = element.closest('.optimized-radio-group');
+                        updateRadioLabels(container, value);
+                        
+                        // Then send to extension with client update flag
+                        vscode.postMessage({
+                            type: settingType === 'mode' ? 'updateFunctionMode' : 'updateFunctionActor',
+                            contractName,
+                            functionName,
+                            [settingType]: value,
+                            clientUpdate: true
+                        });
+                    }
+                    
+                    // Function to update collapsed state without refresh
+                    function updateCollapsedState(contractName, collapsed) {
+                        const contractDiv = document.querySelector(\`[data-contract="\${contractName}"]\`);
+                        if (!contractDiv) return;
+                        
+                        const button = contractDiv.querySelector('.toggle-button .codicon');
+                        if (button) {
+                            if (collapsed) {
+                                button.classList.replace('codicon-chevron-down', 'codicon-chevron-right');
+                            } else {
+                                button.classList.replace('codicon-chevron-right', 'codicon-chevron-down');
+                            }
+                        }
+                        
+                        const functionsList = contractDiv.querySelector('.functions-list');
+                        if (functionsList) {
+                            if (collapsed) {
+                                functionsList.classList.add('collapsed');
+                            } else {
+                                functionsList.classList.remove('collapsed');
+                            }
+                        }
+                    }
+
+                    // Optimized version of toggle contract function
                     function toggleContract(name, enabled) {
+                        showSavingIndicator();
                         vscode.postMessage({
                             type: 'toggleContract',
                             contractName: name,
@@ -518,14 +1006,163 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         });
                     }
 
-                    function toggleAllContracts(checked) {
-                        document.querySelectorAll('.contract-checkbox').forEach(checkbox => {
-                            if (checkbox.checked !== checked) {
-                                checkbox.checked = checked;
-                                const contractName = checkbox.id.replace('contract-', '');
-                                toggleContract(contractName, checked);
+                    // Fuzzy search matching function
+                    function fuzzyMatch(text, search) {
+                        if (!search || search.trim() === '') {
+                            // Return the original text without highlights when search is empty
+                            return { match: true, score: 0, highlighted: text };
+                        }
+                        
+                        search = search.toLowerCase();
+                        const textLower = text.toLowerCase();
+                        
+                        // Direct substring match (higher priority)
+                        if (textLower.includes(search)) {
+                            const index = textLower.indexOf(search);
+                            const highlighted = text.substring(0, index) +
+                                '<span class="highlight">' + text.substring(index, index + search.length) + '</span>' +
+                                text.substring(index + search.length);
+                            return { match: true, score: 0, highlighted };
+                        }
+                        
+                        // Fuzzy matching
+                        let searchIdx = 0;
+                        let score = 0;
+                        let lastMatchIdx = -1;
+                        let consecutive = 0;
+                        const matchPositions = [];
+                        
+                        for (let i = 0; i < textLower.length && searchIdx < search.length; i++) {
+                            if (textLower[i] === search[searchIdx]) {
+                                if (lastMatchIdx === i - 1) {
+                                    consecutive++;
+                                    score -= consecutive * 0.5;
+                                } else {
+                                    consecutive = 0;
+                                }
+                                
+                                score += i;
+                                lastMatchIdx = i;
+                                matchPositions.push(i);
+                                searchIdx++;
+                            }
+                        }
+                        
+                        const match = searchIdx === search.length;
+                        
+                        let highlighted = '';
+                        if (match) {
+                            let lastPos = 0;
+                            for (const pos of matchPositions) {
+                                highlighted += text.substring(lastPos, pos);
+                                highlighted += '<span class="highlight">' + text[pos] + '</span>';
+                                lastPos = pos + 1;
+                            }
+                            highlighted += text.substring(lastPos);
+                        } else {
+                            highlighted = text;
+                        }
+                        
+                        return { match, score, highlighted };
+                    }
+
+                    function filterContracts(query) {
+                        // Update state
+                        state.searchQuery = query;
+                        vscode.setState(state);
+                        
+                        // Tell extension about the query (but don't wait for refresh)
+                        vscode.postMessage({
+                            type: 'updateSearch',
+                            query: query
+                        });
+                        
+                        const contractItems = document.querySelectorAll('.contract-item');
+                        const noResults = document.getElementById('no-results');
+                        const searchTerm = document.getElementById('search-term');
+                        
+                        searchTerm.textContent = query;
+                        
+                        let visibleCount = 0;
+                        const matchedItems = [];
+                        
+                        // First pass: reset all items if the query is empty
+                        if (!query || query.trim() === '') {
+                            contractItems.forEach(item => {
+                                item.classList.remove('hidden');
+                                
+                                // Reset to original text (no highlights)
+                                const nameElement = item.querySelector('.contract-name');
+                                const pathElement = item.querySelector('.contract-path');
+                                
+                                if (nameElement) {
+                                    nameElement.textContent = item.getAttribute('data-name');
+                                }
+                                
+                                if (pathElement) {
+                                    pathElement.textContent = item.getAttribute('data-path');
+                                }
+                                
+                                visibleCount++;
+                            });
+                            
+                            // Hide the no results message
+                            noResults.classList.add('hidden');
+                            return;
+                        }
+                        
+                        // First pass: do the fuzzy matching and collect results
+                        contractItems.forEach(item => {
+                            const contractName = item.getAttribute('data-name');
+                            const contractPath = item.getAttribute('data-path');
+                            
+                            const nameMatch = fuzzyMatch(contractName, query);
+                            const pathMatch = fuzzyMatch(contractPath, query);
+                            
+                            if (nameMatch.match || pathMatch.match) {
+                                matchedItems.push({
+                                    element: item,
+                                    score: Math.min(nameMatch.score, pathMatch.score),
+                                    nameHighlighted: nameMatch.highlighted,
+                                    pathHighlighted: pathMatch.highlighted
+                                });
+                                visibleCount++;
+                            } else {
+                                item.classList.add('hidden');
                             }
                         });
+                        
+                        // Sort matched items by score if we have a query
+                        if (query) {
+                            matchedItems.sort((a, b) => a.score - b.score);
+                        }
+                        
+                        // Apply results
+                        matchedItems.forEach(item => {
+                            item.element.classList.remove('hidden');
+                            
+                            // Update highlighted elements
+                            const nameElement = item.element.querySelector('.contract-name');
+                            const pathElement = item.element.querySelector('.contract-path');
+                            
+                            if (nameElement) {
+                                nameElement.innerHTML = item.nameHighlighted;
+                            }
+                            if (pathElement) {
+                                pathElement.innerHTML = item.pathHighlighted;
+                            }
+                        });
+                        
+                        // Show/hide the "no results" message
+                        if (visibleCount === 0) {
+                            noResults.classList.remove('hidden');
+                        } else {
+                            noResults.classList.add('hidden');
+                        }
+                    }
+
+                    function updateSearch(query) {
+                        filterContracts(query);
                     }
 
                     function toggleFunction(contractName, functionName, enabled) {
@@ -592,11 +1229,22 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                     }
 
-                    function toggleContractSeparated(name, checked) {
+                    function toggleContractSeparated(name, checked, clientUpdate = false) {
+                        if (clientUpdate) {
+                            showSavingIndicator();
+                        }
+                        
+                        // Update client-side state if available
+                        if (state.contractStates[name]) {
+                            state.contractStates[name].separated = checked;
+                            vscode.setState(state);
+                        }
+                        
                         vscode.postMessage({
                             type: 'toggleContractSeparated',
                             contractName: name,
-                            separated: checked
+                            separated: checked,
+                            clientUpdate
                         });
                     }
 
@@ -609,6 +1257,16 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             });
                         });
                     });
+                    
+                    // Initialize with any existing search query
+                    if (state.searchQuery) {
+                        const searchInput = document.getElementById('search-input');
+                        searchInput.value = state.searchQuery;
+                        filterContracts(state.searchQuery);
+                    } else {
+                        // Make sure all contracts are visible with no highlights when there's no search
+                        filterContracts('');
+                    }
                 </script>
             </body>
             </html>`;
@@ -640,51 +1298,60 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             `;
         }
 
-        return this.contracts
+        const visibleContracts = this.contracts
             .filter(contract =>
                 this.hasMutableFunctions(contract) &&
-                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
+                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
             )
             .sort((a, b) => {
                 const aDepth = a.path.split('/').length;
                 const bDepth = b.path.split('/').length;
                 if (aDepth !== bDepth) { return aDepth - bDepth; }
                 return a.path.localeCompare(b.path);
-            })
-            .map((contract, index, array) => `
-                <div class="contract-item" data-contract="${contract.name}">
-                    <div class="contract-header">
-                        <div class="contract-title">
-                            <button class="toggle-button" onclick="toggleCollapse('${contract.name}')">
-                                <i class="codicon ${this.collapsedContracts.has(contract.name) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
-                            </button>
-                            <vscode-checkbox
-                                class="contract-checkbox"
-                                id="contract-${contract.name}"
-                                ${contract.enabled ? 'checked' : ''}
-                                onchange="toggleContract('${contract.name}', this.checked)"
-                            >
-                                ${contract.name}
-                            </vscode-checkbox>
-                            ${contract.enabled ? `
-                                <vscode-checkbox
-                                    class="contract-separated-checkbox"
-                                    id="contract-separated-${contract.name}"
-                                    ${contract.separated !== false ? 'checked' : ''}
-                                    onchange="toggleContractSeparated('${contract.name}', this.checked)"
-                                >
-                                    Separated
-                                </vscode-checkbox>
-                            ` : ''}
-                        </div>
-                        <div class="contract-path" data-path="${contract.path}">${contract.path}</div>
-                    </div>
-                    <div class="functions-list ${this.collapsedContracts.has(contract.name) ? 'collapsed' : ''}">
-                        ${this.getFunctionsHtml(contract)}
-                    </div>
+            });
+
+        if (visibleContracts.length === 0) {
+            return `
+                <div class="no-contracts">
+                    No contracts available.
                 </div>
-                ${index < array.length - 1 ? '<div class="contract-divider"></div>' : ''}
-            `).join('');
+            `;
+        }
+
+        return visibleContracts.map((contract, index, array) => `
+            <div class="contract-item" data-contract="${contract.name}" data-name="${contract.name}" data-path="${contract.path}">
+                <div class="contract-header">
+                    <div class="contract-title">
+                        <button class="toggle-button" onclick="toggleCollapse('${contract.name}')">
+                            <i class="codicon ${this.collapsedContracts.has(contract.name) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
+                        </button>
+                        <vscode-checkbox
+                            class="contract-checkbox"
+                            id="contract-${contract.name}"
+                            ${contract.enabled ? 'checked' : ''}
+                            onchange="toggleContract('${contract.name}', this.checked)"
+                        >
+                            <span class="contract-name">${contract.name}</span>
+                        </vscode-checkbox>
+                        ${contract.enabled ? `
+                            <vscode-checkbox
+                                class="contract-separated-checkbox"
+                                id="contract-separated-${contract.name}"
+                                ${contract.separated !== false ? 'checked' : ''}
+                                onchange="toggleContractSeparated('${contract.name}', this.checked)"
+                            >
+                                Separated
+                            </vscode-checkbox>
+                        ` : ''}
+                    </div>
+                    <div class="contract-path" data-path="${contract.path}">${contract.path}</div>
+                </div>
+                <div class="functions-list ${this.collapsedContracts.has(contract.name) ? 'collapsed' : ''}">
+                    ${this.getFunctionsHtml(contract)}
+                </div>
+            </div>
+            ${index < array.length - 1 ? '<div class="contract-divider"></div>' : ''}
+        `).join('');
     }
 
     private getFunctionsHtml(contract: ContractMetadata): string {
@@ -696,16 +1363,16 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return `
             <div class="functions-list">
                 ${functions.map(fn => {
-            const signature = this.getFunctionSignature(fn);
-            // Find existing config or use default only if no config exists
-            const config = contract.functionConfigs?.find(f => f.signature === signature) ?? {
-                signature,
-                actor: Actor.ACTOR,
-                mode: Mode.NORMAL
-            };
-            const isEnabled = contract.enabledFunctions?.includes(signature);
+                    const signature = this.getFunctionSignature(fn);
+                    // Find existing config or use default only if no config exists
+                    const config = contract.functionConfigs?.find(f => f.signature === signature) ?? {
+                        signature,
+                        actor: Actor.ACTOR,
+                        mode: Mode.NORMAL
+                    };
+                    const isEnabled = contract.enabledFunctions?.includes(signature);
 
-            return `
+                    return `
                         <div class="function-item">
                             <div class="function-header">
                                 <vscode-checkbox
@@ -720,31 +1387,51 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             ${isEnabled ? `
                                 <div class="function-content">
                                     <div class="function-settings">
-                                        <vscode-radio-group 
-                                            orientation="horizontal"
-                                            data-type="mode"
-                                            onchange="updateFunctionMode('${contract.name}', '${signature}', this.value)"
-                                            value="${config.mode}"
-                                        >
-                                            <vscode-radio value="normal" ${config.mode === Mode.NORMAL ? 'checked' : ''}>Normal</vscode-radio>
-                                            <vscode-radio value="fail" ${config.mode === Mode.FAIL ? 'checked' : ''}>Fail</vscode-radio>
-                                            <vscode-radio value="catch" ${config.mode === Mode.CATCH ? 'checked' : ''}>Catch</vscode-radio>
-                                        </vscode-radio-group>
-                                        <vscode-radio-group 
-                                            orientation="horizontal"
-                                            data-type="actor"
-                                            onchange="updateFunctionActor('${contract.name}', '${signature}', this.value)"
-                                            value="${config.actor}"
-                                        >
-                                            <vscode-radio value="actor" ${config.actor === Actor.ACTOR ? 'checked' : ''}>Actor</vscode-radio>
-                                            <vscode-radio value="admin" ${config.actor === Actor.ADMIN ? 'checked' : ''}>Admin</vscode-radio>
-                                        </vscode-radio-group>
+                                        <div class="optimized-radio-group" data-type="mode">
+                                            <span class="optimized-radio">
+                                                <label class="radio-label ${config.mode === Mode.NORMAL ? 'selected' : ''}" 
+                                                       data-value="normal" 
+                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'normal', this)">
+                                                    Normal
+                                                </label>
+                                            </span>
+                                            <span class="optimized-radio">
+                                                <label class="radio-label ${config.mode === Mode.FAIL ? 'selected' : ''}" 
+                                                       data-value="fail" 
+                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'fail', this)">
+                                                    Fail
+                                                </label>
+                                            </span>
+                                            <span class="optimized-radio">
+                                                <label class="radio-label ${config.mode === Mode.CATCH ? 'selected' : ''}" 
+                                                       data-value="catch" 
+                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'catch', this)">
+                                                    Catch
+                                                </label>
+                                            </span>
+                                        </div>
+                                        <div class="optimized-radio-group" data-type="actor">
+                                            <span class="optimized-radio">
+                                                <label class="radio-label ${config.actor === Actor.ACTOR ? 'selected' : ''}" 
+                                                       data-value="actor" 
+                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'actor', 'actor', this)">
+                                                    Actor
+                                                </label>
+                                            </span>
+                                            <span class="optimized-radio">
+                                                <label class="radio-label ${config.actor === Actor.ADMIN ? 'selected' : ''}" 
+                                                       data-value="admin" 
+                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'actor', 'admin', this)">
+                                                    Admin
+                                                </label>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             ` : ''}
                         </div>
                     `;
-        }).join('')}
+                }).join('')}
             </div>
         `;
     }

@@ -197,7 +197,8 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
-                retainContextWhenHidden: true
+                retainContextWhenHidden: true,
+                enableFindWidget: true
             }
         );
 
