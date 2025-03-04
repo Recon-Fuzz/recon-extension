@@ -30,18 +30,26 @@ export async function findOutputDirectory(workspaceRoot: string): Promise<string
 export async function getTestFolder(workspaceRoot: string): Promise<string> {
     const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
     const foundryRoot = path.dirname(foundryConfigPath);
-    try {
-        await fs.access(path.join(foundryRoot, 'tests'));
-        return 'tests';
-    } catch {
+    
+    const testPaths = [
+        'tests',
+        'src/tests',
+        'src/test',
+        'contracts/tests',
+        'contracts/test',
+    ];
+
+    for (const testPath of testPaths) {
         try {
-            await fs.access(path.join(foundryRoot, 'test'));
-            return 'test';
+            await fs.access(path.join(foundryRoot, testPath));
+            return testPath;
         } catch {
-            return 'test';
+            continue;
         }
     }
-};
+
+    return 'test'; // default fallback
+}
 
 export async function outputDirectoryExist(workspaceRoot: string): Promise<boolean> {
     try {

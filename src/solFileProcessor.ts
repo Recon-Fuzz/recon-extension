@@ -36,53 +36,52 @@ export class SolFileProcessor implements vscode.CodeLensProvider {
 
             // Add target function CodeLenses
             for (const func of targetFunctions) {
-                // Find if this function is configured in recon.json
-                for (const contract of enabledContracts) {
-                    const config = contract.functionConfigs?.find(f => {
+                const config = enabledContracts
+                    .find(c => c.name === func.contractName)
+                    ?.functionConfigs?.find(f => {
                         const [funcName] = f.signature.split('(');
                         return funcName === func.name;
                     });
 
-                    if (config) {
-                        // Mode CodeLenses
-                        codeLenses.push(
-                            new vscode.CodeLens(func.range, {
-                                title: `⚫ ${config.mode === Mode.NORMAL ? '✓' : ''} Normal Mode`,
-                                command: 'recon.setFunctionMode',
-                                arguments: [document.uri, func.contractName, func.name, 'normal', func.range, func.fnParams]
-                            })
-                        );
-                        codeLenses.push(
-                            new vscode.CodeLens(func.range, {
-                                title: `🔴 ${config.mode === Mode.FAIL ? '✓' : ''} Fail Mode`,
-                                command: 'recon.setFunctionMode',
-                                arguments: [document.uri, func.contractName, func.name, Mode.FAIL, func.range, func.fnParams]
-                            })
-                        );
-                        codeLenses.push(
-                            new vscode.CodeLens(func.range, {
-                                title: `🟡 ${config.mode === Mode.CATCH ? '✓' : ''} Catch Mode`,
-                                command: 'recon.setFunctionMode',
-                                arguments: [document.uri, func.contractName, func.name, Mode.CATCH, func.range, func.fnParams]
-                            })
-                        );
+                if (config) {
+                    // Mode CodeLenses
+                    codeLenses.push(
+                        new vscode.CodeLens(func.range, {
+                            title: `⚫ ${config.mode === Mode.NORMAL ? '✓' : ''} Normal Mode`,
+                            command: 'recon.setFunctionMode',
+                            arguments: [document.uri, func.contractName, func.name, 'normal', func.range, func.fnParams]
+                        })
+                    );
+                    codeLenses.push(
+                        new vscode.CodeLens(func.range, {
+                            title: `🔴 ${config.mode === Mode.FAIL ? '✓' : ''} Fail Mode`,
+                            command: 'recon.setFunctionMode',
+                            arguments: [document.uri, func.contractName, func.name, Mode.FAIL, func.range, func.fnParams]
+                        })
+                    );
+                    codeLenses.push(
+                        new vscode.CodeLens(func.range, {
+                            title: `🟡 ${config.mode === Mode.CATCH ? '✓' : ''} Catch Mode`,
+                            command: 'recon.setFunctionMode',
+                            arguments: [document.uri, func.contractName, func.name, Mode.CATCH, func.range, func.fnParams]
+                        })
+                    );
 
-                        // Actor CodeLenses
-                        codeLenses.push(
-                            new vscode.CodeLens(func.range, {
-                                title: `👤 ${config.actor === Actor.ACTOR ? '✓' : ''} As Actor`,
-                                command: 'recon.setFunctionActor',
-                                arguments: [document.uri, func.contractName, func.name, Actor.ACTOR, func.range, func.fnParams]
-                            })
-                        );
-                        codeLenses.push(
-                            new vscode.CodeLens(func.range, {
-                                title: `👑 ${config.actor === Actor.ADMIN ? '✓' : ''} As Admin`,
-                                command: 'recon.setFunctionActor',
-                                arguments: [document.uri, func.contractName, func.name, Actor.ADMIN, func.range, func.fnParams]
-                            })
-                        );
-                    }
+                    // Actor CodeLenses
+                    codeLenses.push(
+                        new vscode.CodeLens(func.range, {
+                            title: `👤 ${config.actor === Actor.ACTOR ? '✓' : ''} As Actor`,
+                            command: 'recon.setFunctionActor',
+                            arguments: [document.uri, func.contractName, func.name, Actor.ACTOR, func.range, func.fnParams]
+                        })
+                    );
+                    codeLenses.push(
+                        new vscode.CodeLens(func.range, {
+                            title: `👑 ${config.actor === Actor.ADMIN ? '✓' : ''} As Admin`,
+                            command: 'recon.setFunctionActor',
+                            arguments: [document.uri, func.contractName, func.name, Actor.ADMIN, func.range, func.fnParams]
+                        })
+                    );
                 }
             }
         } catch (e) {
@@ -119,50 +118,62 @@ export class SolFileProcessor implements vscode.CodeLensProvider {
 
     private async findTargetFunctions(document: vscode.TextDocument, ast: any): Promise<TargetFunction[]> {
         const functions: TargetFunction[] = [];
+        const processedFunctions = new Set<string>();
         const enabledContracts = await this.reconContractsView.getEnabledContractData();
 
         parser.visit(ast, {
             FunctionDefinition: (node) => {
                 if (node.loc) {
-                    for (const contract of enabledContracts) {
+                    // Find matching contract for this function
+                    const matchingContract = enabledContracts.find(contract => {
                         const expectedPrefix = `${camel(contract.name)}_`;
-                        if (node.name && node.name.startsWith(expectedPrefix)) {
-                            const actualFunctionName = node.name.substring(expectedPrefix.length);
+                        return node.name && node.name.startsWith(expectedPrefix);
+                    });
 
-                            // Find function configuration and ABI
-                            const functionConfig = contract.functionConfigs?.find(config => {
-                                const [configFuncName] = config.signature.split('(');
-                                return configFuncName === actualFunctionName;
-                            });
+                    if (matchingContract) {
+                        const expectedPrefix = `${camel(matchingContract.name)}_`;
+                        const actualFunctionName = node.name!.substring(expectedPrefix.length);
+                        
+                        // Skip if already processed
+                        const functionKey = `${matchingContract.name}_${actualFunctionName}`;
+                        if (processedFunctions.has(functionKey)) {
+                            return;
+                        }
+                        processedFunctions.add(functionKey);
 
-                            const functionAbi = contract.abi.find(item =>
-                                item.type === 'function' &&
-                                item.name === actualFunctionName
+                        // Find function configuration and ABI
+                        const functionConfig = matchingContract.functionConfigs?.find(config => {
+                            const [configFuncName] = config.signature.split('(');
+                            return configFuncName === actualFunctionName;
+                        });
+
+                        const functionAbi = matchingContract.abi.find(item =>
+                            item.type === 'function' &&
+                            item.name === actualFunctionName
+                        );
+
+                        if (functionConfig && functionAbi) {
+                            const range = new vscode.Range(
+                                new vscode.Position(node.loc.start.line - 1, node.loc.start.column),
+                                new vscode.Position(node.loc.end.line - 1, node.loc.end.column + 1)
                             );
-
-                            if (functionConfig && functionAbi) {
-                                const range = new vscode.Range(
-                                    new vscode.Position(node.loc.start.line - 1, node.loc.start.column),
-                                    new vscode.Position(node.loc.end.line - 1, node.loc.end.column + 1)
-                                );
-                                functions.push({
-                                    name: actualFunctionName,
-                                    fullName: node.name,
-                                    range,
-                                    isPublicOrExternal:
-                                        node.visibility === 'public' ||
-                                        node.visibility === 'external',
-                                    contractName: contract.name,
-                                    fnParams: {
-                                        contractName: contract.name,
-                                        contractPath: contract.path,
-                                        functionName: actualFunctionName,
-                                        abi: functionAbi,
-                                        actor: functionConfig.actor,
-                                        mode: functionConfig.mode
-                                    }
-                                });
-                            }
+                            functions.push({
+                                name: actualFunctionName,
+                                fullName: node.name || '',
+                                range,
+                                isPublicOrExternal:
+                                    node.visibility === 'public' ||
+                                    node.visibility === 'external',
+                                contractName: matchingContract.name,
+                                fnParams: {
+                                    contractName: matchingContract.name,
+                                    contractPath: matchingContract.path,
+                                    functionName: actualFunctionName,
+                                    abi: functionAbi,
+                                    actor: functionConfig.actor,
+                                    mode: functionConfig.mode
+                                }
+                            });
                         }
                     }
                 }

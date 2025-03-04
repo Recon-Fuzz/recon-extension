@@ -669,6 +669,26 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         display: flex;
                         gap: 2px;
                         margin: 4px 0;
+                        margin-bottom: 8px;
+                    }
+                    .section-header {
+                        padding: 8px;
+                        font-weight: 600;
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.1em;
+                        color: var(--vscode-foreground);
+                        opacity: 0.8;
+                        background: rgba(255, 255, 255, 0.1);
+                        border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
+                    }
+                    .section-divider {
+                        height: 2px;
+                        background-color: var(--vscode-sideBarSectionHeader-border);
+                    }
+                    .enabled-contracts {
+                        background: var(--vscode-sideBarSectionHeader-background);
+                        margin-bottom: 8px;
                     }
                 </style>
             </head>
@@ -1113,22 +1133,26 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         
                         // First pass: do the fuzzy matching and collect results
                         contractItems.forEach(item => {
-                            const contractName = item.getAttribute('data-name');
-                            const contractPath = item.getAttribute('data-path');
-                            
-                            const nameMatch = fuzzyMatch(contractName, query);
-                            const pathMatch = fuzzyMatch(contractPath, query);
-                            
-                            if (nameMatch.match || pathMatch.match) {
-                                matchedItems.push({
-                                    element: item,
-                                    score: Math.min(nameMatch.score, pathMatch.score),
-                                    nameHighlighted: nameMatch.highlighted,
-                                    pathHighlighted: pathMatch.highlighted
-                                });
-                                visibleCount++;
-                            } else {
-                                item.classList.add('hidden');
+                            const contractGroup = item.closest('.contract-group');
+                            if (contractGroup) {
+                                const contractName = item.getAttribute('data-name');
+                                const contractPath = item.getAttribute('data-path');
+                                
+                                const nameMatch = fuzzyMatch(contractName, query);
+                                const pathMatch = fuzzyMatch(contractPath, query);
+                                
+                                if (nameMatch.match || pathMatch.match) {
+                                    contractGroup.classList.remove('hidden');
+                                    matchedItems.push({
+                                        element: item,
+                                        score: Math.min(nameMatch.score, pathMatch.score),
+                                        nameHighlighted: nameMatch.highlighted,
+                                        pathHighlighted: pathMatch.highlighted
+                                    });
+                                    visibleCount++;
+                                } else {
+                                    contractGroup.classList.add('hidden');
+                                }
                             }
                         });
                         
@@ -1318,40 +1342,73 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             `;
         }
 
-        return visibleContracts.map((contract, index, array) => `
-            <div class="contract-item" data-contract="${contract.name}" data-name="${contract.name}" data-path="${contract.path}">
-                <div class="contract-header">
-                    <div class="contract-title">
-                        <button class="toggle-button" onclick="toggleCollapse('${contract.name}')">
-                            <i class="codicon ${this.collapsedContracts.has(contract.name) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
-                        </button>
-                        <vscode-checkbox
-                            class="contract-checkbox"
-                            id="contract-${contract.name}"
-                            ${contract.enabled ? 'checked' : ''}
-                            onchange="toggleContract('${contract.name}', this.checked)"
-                        >
-                            <span class="contract-name">${contract.name}</span>
-                        </vscode-checkbox>
-                        ${contract.enabled ? `
+        // Separate enabled and disabled contracts
+        const enabledContracts = visibleContracts.filter(c => c.enabled);
+        const disabledContracts = visibleContracts.filter(c => !c.enabled);
+
+        return `
+            ${enabledContracts.length > 0 ? `
+                <div class="contracts-section enabled-contracts">
+                    <div class="section-header">Selected Contracts</div>
+                    ${enabledContracts.map((contract, index, array) => this.renderContractItem(contract, index, array)).join('')}
+                </div>
+            ` : ''}
+            ${enabledContracts.length > 0 && disabledContracts.length > 0 ? `
+                <div class="section-divider"></div>
+            ` : ''}
+            ${disabledContracts.length > 0 ? `
+                <div class="contracts-section disabled-contracts">
+                    ${disabledContracts.length > 0 && enabledContracts.length > 0 ? `
+                        <div class="section-header">Available Contracts</div>
+                    ` : ''}
+                    ${disabledContracts.map((contract, index, array) => this.renderContractItem(contract, index, array)).join('')}
+                </div>
+            ` : ''}
+        `;
+    }
+
+    // Add this helper method to keep the contract rendering logic clean
+    private renderContractItem(contract: ContractMetadata, index: number, array: ContractMetadata[]): string {
+        return `
+            <div class="contract-group">
+                <div class="contract-item" data-contract="${contract.name}" data-name="${contract.name}" data-path="${contract.path}">
+                    <div class="contract-header">
+                        <div class="contract-title">
+                            ${contract.enabled ? `
+                                <button class="toggle-button" onclick="toggleCollapse('${contract.name}')">
+                                    <i class="codicon ${this.collapsedContracts.has(contract.name) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
+                                </button>
+                            ` : ''}
                             <vscode-checkbox
-                                class="contract-separated-checkbox"
-                                id="contract-separated-${contract.name}"
-                                ${contract.separated !== false ? 'checked' : ''}
-                                onchange="toggleContractSeparated('${contract.name}', this.checked)"
+                                class="contract-checkbox"
+                                id="contract-${contract.name}"
+                                ${contract.enabled ? 'checked' : ''}
+                                onchange="toggleContract('${contract.name}', this.checked)"
                             >
-                                Separated
+                                <span class="contract-name">${contract.name}</span>
                             </vscode-checkbox>
-                        ` : ''}
+                            ${contract.enabled ? `
+                                <vscode-checkbox
+                                    class="contract-separated-checkbox"
+                                    id="contract-separated-${contract.name}"
+                                    ${contract.separated !== false ? 'checked' : ''}
+                                    onchange="toggleContractSeparated('${contract.name}', this.checked)"
+                                >
+                                    Separated
+                                </vscode-checkbox>
+                            ` : ''}
+                        </div>
+                        <div class="contract-path" data-path="${contract.path}">${contract.path}</div>
                     </div>
-                    <div class="contract-path" data-path="${contract.path}">${contract.path}</div>
+                    ${contract.enabled ? `
+                        <div class="functions-list ${this.collapsedContracts.has(contract.name) ? 'collapsed' : ''}">
+                            ${this.getFunctionsHtml(contract)}
+                        </div>
+                    ` : ''}
                 </div>
-                <div class="functions-list ${this.collapsedContracts.has(contract.name) ? 'collapsed' : ''}">
-                    ${this.getFunctionsHtml(contract)}
-                </div>
+                ${index < array.length - 1 ? '<div class="contract-divider"></div>' : ''}
             </div>
-            ${index < array.length - 1 ? '<div class="contract-divider"></div>' : ''}
-        `).join('');
+        `;
     }
 
     private getFunctionsHtml(contract: ContractMetadata): string {
