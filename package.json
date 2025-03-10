@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "license": "MIT",
   "publisher": "Recon-Fuzz",
   "repository": {
@@ -77,6 +77,11 @@
       "explorer/context": [
         {
           "command": "recon.generateMock",
+          "when": "resourceExtname == .json || resourceExtname == .sol",
+          "group": "2_workspace"
+        },
+        {
+          "command": "recon.generateTargetFunctions",
           "when": "resourceExtname == .json || resourceExtname == .sol",
           "group": "2_workspace"
         },
@@ -171,6 +176,11 @@
         "command": "recon.refreshCoverage",
         "title": "Refresh Coverage",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "recon.generateTargetFunctions",
+        "title": "Generate Target Functions",
+        "category": "Recon"
       }
     ],
     "configuration": {
@@ -263,6 +273,18 @@
           "default": "test/recon/mocks",
           "description": "Path to store generated mock contracts (relative to foundry.toml location)",
           "order": 11
+        },
+        "recon.mockAutoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically save generated mock contracts to disk",
+          "order": 12
+        },
+        "recon.customTestFolderPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
+          "order": 13
         }
       }
     }

@@ -26,6 +26,9 @@ export function registerMockCommands(
                 const mocksFolderPath = vscode.workspace.getConfiguration('recon').get<string>('mocksFolderPath', 'test/recon/mocks');
                 const mocksFolder = path.join(foundryRoot, mocksFolderPath);
 
+                // Check if auto-save is enabled
+                const autoSave = vscode.workspace.getConfiguration('recon').get<boolean>('mockAutoSave', true);
+
                 let abiFilePath: string;
                 
                 // Check if this is a Solidity file or a JSON file
@@ -52,23 +55,55 @@ export function registerMockCommands(
                 // Extract contract name from JSON file name (remove .json extension)
                 const contractName = path.basename(abiFilePath, '.json');
                 const mockName = `${contractName}Mock`;
+                const mockFilePath = path.join(mocksFolder, `${mockName}.sol`);
 
-                // Ensure mocks directory exists
-                await vscode.workspace.fs.createDirectory(vscode.Uri.file(mocksFolder));
+                if (autoSave) {
+                    // Ensure mocks directory exists and save the file
+                    await vscode.workspace.fs.createDirectory(vscode.Uri.file(mocksFolder));
 
-                // Generate mock using abi-to-mock
-                await AbiToMock(
-                    abiFilePath,           // Full path to ABI
-                    mocksFolder,           // Output directory
-                    mockName               // Mock contract name
-                );
+                    // Generate mock using abi-to-mock
+                    await AbiToMock(
+                        abiFilePath,           // Full path to ABI
+                        mocksFolder,           // Output directory
+                        mockName               // Mock contract name
+                    );
 
-                vscode.window.showInformationMessage(`Generated mock contract: ${mockName}`);
+                    vscode.window.showInformationMessage(`Generated mock contract: ${mockName}`);
 
-                // Open the generated mock file
-                const mockPath = vscode.Uri.file(path.join(mocksFolder, `${mockName}.sol`));
-                const doc = await vscode.workspace.openTextDocument(mockPath);
-                await vscode.window.showTextDocument(doc);
+                    // Open the generated mock file
+                    const mockPath = vscode.Uri.file(mockFilePath);
+                    const doc = await vscode.workspace.openTextDocument(mockPath);
+                    await vscode.window.showTextDocument(doc);
+                } else {
+                    // Generate to a temp file/string and open as unsaved document
+                    const tempDir = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, '.recon-temp');
+                    await vscode.workspace.fs.createDirectory(vscode.Uri.file(tempDir));
+                    
+                    // Generate mock to temp location
+                    await AbiToMock(
+                        abiFilePath,           
+                        tempDir,           
+                        mockName               
+                    );
+                    
+                    // Read the generated file content
+                    const tempMockPath = path.join(tempDir, `${mockName}.sol`);
+                    const content = await fs.readFile(tempMockPath, 'utf8');
+                    
+                    // Create a new untitled document with the mock content
+                    const document = await vscode.workspace.openTextDocument({
+                        language: 'solidity',
+                        content: content
+                    });
+                    
+                    // Show the document
+                    await vscode.window.showTextDocument(document);
+                    
+                    // Delete the temp file
+                    await fs.unlink(tempMockPath);
+                    
+                    vscode.window.showInformationMessage(`Generated mock contract: ${mockName} (not saved)`);
+                }
 
             } catch (error: any) {
                 console.error('Failed to generate mock:', error);

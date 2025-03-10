@@ -31,7 +31,14 @@ export async function getTestFolder(workspaceRoot: string): Promise<string> {
     const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
     const foundryRoot = path.dirname(foundryConfigPath);
     
+    // Check if custom path is set in settings
+    const customPath = vscode.workspace.getConfiguration('recon').get<string>('customTestFolderPath', '');
+    if (customPath) {
+        return customPath;
+    }
+
     const testPaths = [
+        'test',
         'tests',
         'src/tests',
         'src/test',

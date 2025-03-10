@@ -4,7 +4,7 @@ import { registerHelpers } from '../handlebars-helpers';
 registerHelpers(handlebars);
 
 export const echidnaConfigTemplate = handlebars.compile(`testMode: "assertion"
-prefix: "invariant_"
+prefix: "echidna_"
 coverage: true
 corpusDir: "echidna"
 balanceAddr: 0x1043561a8829300000

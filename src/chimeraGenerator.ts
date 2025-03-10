@@ -66,24 +66,29 @@ export class ChimeraGenerator {
     async generate(progress: vscode.Progress<{ message?: string }>): Promise<ContractMetadata[]> {
         const foundryRoot = await this.getFoundryRoot();
         const chimeraPath = path.join(foundryRoot, 'lib', 'chimera');
+        const setupHelpersPath = path.join(foundryRoot, 'lib', 'setup-helpers');
 
-        // Step 1: Install Chimera
+        // Install Chimera
         progress.report({ message: "Installing Chimera..." });
         await this.installChimera(chimeraPath);
 
-        // Step 2: Handle remappings
+        // Install Chimera
+        progress.report({ message: "Installing Setup Helpers..." });
+        await this.installSetupHelpers(setupHelpersPath);
+
+        // Handle remappings
         progress.report({ message: "Updating remappings..." });
         await this.updateRemappings();
 
-        // Step 3: Handle remappings
+        // Handle gitignore
         progress.report({ message: "Updating gitignore..." });
         await this.updateGitignore();
 
-        // Step 4: Generate templates
+        // Generate templates
         progress.report({ message: "Generating templates..." });
         await this.templateManager.generateTemplates();
 
-        // Step 5: Find contracts
+        // Find contracts
         progress.report({ message: "Scanning contracts..." });
         const outPath = await findOutputDirectory(this.workspaceRoot);
         const contracts = await this.findSourceContracts(outPath);
@@ -108,6 +113,23 @@ export class ChimeraGenerator {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
                 exec('forge install Recon-Fuzz/chimera --no-git',
+                    { cwd: foundryRoot },
+                    (error, stdout, stderr) => {
+                        if (error) {reject(error);}
+                        else {resolve(stdout);}
+                    }
+                );
+            });
+        }
+    }
+
+    private async installSetupHelpers(setupHelpersPath: string): Promise<void> {
+        try {
+            await fs.access(setupHelpersPath);
+        } catch {
+            const foundryRoot = await this.getFoundryRoot();
+            await new Promise((resolve, reject) => {
+                exec('forge install Recon-Fuzz/setup-helpers --no-git',
                     { cwd: foundryRoot },
                     (error, stdout, stderr) => {
                         if (error) {reject(error);}
@@ -164,6 +186,7 @@ export class ChimeraGenerator {
 
         const currentRemappings = await fs.readFile(remappingsPath, 'utf8');
         const chimeraMapping = '@chimera/=lib/chimera/src/';
+        const setupToolsMapping = '@recon/=lib/setup-helpers/src/';
         
         const remappings = currentRemappings
             .split('\n')
@@ -171,6 +194,7 @@ export class ChimeraGenerator {
             .filter(line => line && !line.startsWith('@chimera'));
 
         remappings.push(chimeraMapping);
+        remappings.push(setupToolsMapping);
         
         await fs.writeFile(remappingsPath, remappings.join('\n'));
     }

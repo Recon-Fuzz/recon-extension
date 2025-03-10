@@ -30,7 +30,7 @@ Recon is a VS Code extension that streamlines smart contract testing by providin
 - **Status bar integration**: Quick access to fuzzing tools
 - **Coverage visualization**: View and analyze code coverage from fuzzers
 - **Test reproduction**: Generate Foundry test cases from fuzzing findings
-- **Mock generation**: Easily create mock contracts for testing
+- **Mock/TargetFunctions generation**: Easily create mock contracts and target functions for testing
 - **CodeLens integration**: Run tests and modify function behaviors directly in the editor
 
 ## Installation

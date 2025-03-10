@@ -216,12 +216,6 @@ export class TemplateManager {
                 functions: nonSeparatedFunctions,
                 contracts: allContractNames
             }),
-            [`${testFolder}/recon/helpers/Utils.sol`]: templates.utilsTemplate({}),
-            [`${testFolder}/recon/helpers/Panic.sol`]: templates.panicTemplate({}),
-            [`${testFolder}/recon/managers/ActorManager.sol`]: templates.actorManagerTemplate({}),
-            [`${testFolder}/recon/managers/AssetManager.sol`]: templates.assetManagerTemplate({}),
-            [`${testFolder}/recon/managers/utils/EnumerableSet.sol`]: templates.enumerableSetTemplate({}),
-            [`${testFolder}/recon/mocks/MockERC20.sol`]: templates.mockERC20Template({}),
             [`${testFolder}/recon/targets/AdminTargets.sol`]: templates.adminTargetsTemplate({ functions: adminFunctions }),
             [`${testFolder}/recon/targets/DoomsdayTargets.sol`]: templates.doomsdayTargetsTemplate({}),
             [`${testFolder}/recon/targets/ManagersTargets.sol`]: templates.managersTargetsTemplate({}),
