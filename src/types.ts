@@ -137,3 +137,26 @@ export interface ProcessResult {
     stdout: string;
     stderr: string;
 }
+
+export interface FunctionLocation {
+    name: string;
+    startLine: number;
+    endLine: number;
+    stateMutability?: string;
+}
+
+export interface ContractFunction {
+    name: string;
+    location: FunctionLocation;
+    coverage: {
+        coveredLines: number;
+        totalLines: number;
+        percentage: number;
+    };
+}
+
+export interface ContractCoverage {
+    path: string;
+    functions: ContractFunction[];
+    changed?: boolean;
+}

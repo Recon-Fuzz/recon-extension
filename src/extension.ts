@@ -10,6 +10,7 @@ import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import * as fs from 'fs/promises';
 import { getFoundryConfigPath, outputDirectoryExist } from './utils';
+import { CoverageMonitorProvider } from './coverageMonitorView';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Create services
@@ -21,6 +22,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
     const reconContractsProvider = new ReconContractsViewProvider(context.extensionUri, context);
     const coverageViewProvider = new CoverageViewProvider(context.extensionUri);
+    const coverageMonitorProvider = new CoverageMonitorProvider(context.extensionUri);
     
     // Register WebView Providers
     context.subscriptions.push(
@@ -28,6 +30,23 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider('recon-contracts', reconContractsProvider),
         vscode.window.registerWebviewViewProvider('recon-coverage', coverageViewProvider),
         reconContractsProvider
+    );
+
+    // Register Coverage Monitor as a separate panel
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.openCoverageMonitor', () => {
+            const panel = vscode.window.createWebviewPanel(
+                'recon-coverage-monitor',
+                'Coverage Monitor',
+                vscode.ViewColumn.Two,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [context.extensionUri]
+                }
+            );
+            coverageMonitorProvider.resolveWebviewPanel(panel);
+        })
     );
 
     // Create and setup contract watcher

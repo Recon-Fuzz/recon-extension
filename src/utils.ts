@@ -30,7 +30,7 @@ export async function findOutputDirectory(workspaceRoot: string): Promise<string
 export async function getTestFolder(workspaceRoot: string): Promise<string> {
     const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
     const foundryRoot = path.dirname(foundryConfigPath);
-    
+
     // Check if custom path is set in settings
     const customPath = vscode.workspace.getConfiguration('recon').get<string>('customTestFolderPath', '');
     if (customPath) {
@@ -224,4 +224,18 @@ export async function cleanupCoverageReport(workspaceRoot: string, content: stri
     } else {
         return cleanupEchidnaCoverageReport(workspaceRoot, content);
     }
+}
+
+export function shouldExclude(filePath: string): boolean {
+    return filePath.startsWith('test/') ||
+        filePath.startsWith('tests/') ||
+        filePath.startsWith('src/tests/') ||
+        filePath.startsWith('src/test/') ||
+        filePath.startsWith('contracts/tests/') ||
+        filePath.startsWith('contracts/test/') ||
+        filePath.endsWith('.t.sol') ||
+        filePath.endsWith('.s.sol') ||
+        filePath.startsWith('lib/') ||
+        filePath.startsWith('node_modules/') ||
+        filePath.startsWith('script/');
 }

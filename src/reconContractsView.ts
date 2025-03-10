@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { shouldExclude } from './utils';
 import { ContractMetadata, FunctionConfig, Abi, Actor, Mode } from './types';
 
 export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
@@ -1325,7 +1326,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         const visibleContracts = this.contracts
             .filter(contract =>
                 this.hasMutableFunctions(contract) &&
-                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
+                (this.showAllFiles || !shouldExclude(contract.path))
             )
             .sort((a, b) => {
                 const aDepth = a.path.split('/').length;

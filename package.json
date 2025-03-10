@@ -181,6 +181,11 @@
         "command": "recon.generateTargetFunctions",
         "title": "Generate Target Functions",
         "category": "Recon"
+      },
+      {
+        "command": "recon.openCoverageMonitor",
+        "title": "Open Coverage Monitor",
+        "category": "Recon"
       }
     ],
     "configuration": {

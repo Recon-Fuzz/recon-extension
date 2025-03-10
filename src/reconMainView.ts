@@ -53,6 +53,9 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('recon.runMedusa');
                     }
                     break;
+                case 'openMonitor':
+                    vscode.commands.executeCommand('recon.openCoverageMonitor');
+                    break;
             }
         });
 
@@ -221,10 +224,22 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         width: 100%;
                         margin-top: 16px;
                     }
+                    #monitor-btn {
+                        margin-top: 16px;
+                        width: 100%;
+                    }
                 </style>
             </head>
             <body>
                 ${mainContent}
+                
+                <vscode-button id="monitor-btn" appearance="secondary" onclick="vscode.postMessage({type: 'openMonitor'})">
+                    <span class="generate-btn-content">
+                        <i class="codicon codicon-pulse"></i>
+                        Coverage Monitor
+                    </span>
+                </vscode-button>
+
                 <script>
                     const vscode = acquireVsCodeApi();
                     
