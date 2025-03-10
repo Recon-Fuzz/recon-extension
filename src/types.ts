@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+
 export enum Actor {
     ACTOR = 'actor',
     ADMIN = 'admin'
@@ -142,8 +143,21 @@ export interface FunctionLocation {
     name: string;
     startLine: number;
     endLine: number;
+    excludedLines: number[];
     stateMutability?: string;
 }
+
+export interface CoverageEntry {
+    line: number;
+    revert: number;
+    success: number;
+    isCovered: boolean;
+}
+
+export interface CoverageState {
+    [file: string]: CoverageEntry[];
+}
+
 
 export interface ContractFunction {
     name: string;

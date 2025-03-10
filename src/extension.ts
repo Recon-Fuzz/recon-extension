@@ -7,7 +7,6 @@ import { CoverageViewProvider } from './coverageView';
 import { SolFileProcessor } from './solFileProcessor';
 import { OutputService } from './services/outputService';
 import { ContractWatcherService } from './services/contractWatcherService';
-import { WorkspaceService } from './services/workspaceService';
 import * as fs from 'fs/promises';
 import { getFoundryConfigPath, outputDirectoryExist } from './utils';
 import { CoverageMonitorProvider } from './coverageMonitorView';
@@ -16,7 +15,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // Create services
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
-    const workspaceService = new WorkspaceService();
     
     // Create view providers
     const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
@@ -69,8 +67,7 @@ export async function activate(context: vscode.ExtensionContext) {
         reconMainProvider,
         reconContractsProvider,
         coverageViewProvider,
-        contractWatcherService,
-        workspaceService
+        contractWatcherService
     });
 
     // Check if we need to build the project automatically

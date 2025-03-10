@@ -4,7 +4,6 @@ import { ReconMainViewProvider } from '../reconMainView';
 import { ReconContractsViewProvider } from '../reconContractsView';
 import { CoverageViewProvider } from '../coverageView';
 import { ContractWatcherService } from './contractWatcherService';
-import { WorkspaceService } from './workspaceService';
 
 export interface ServiceContainer {
     outputService: OutputService;
@@ -13,5 +12,4 @@ export interface ServiceContainer {
     reconContractsProvider: ReconContractsViewProvider;
     coverageViewProvider: CoverageViewProvider;
     contractWatcherService: ContractWatcherService;
-    workspaceService?: WorkspaceService;
 }

@@ -322,6 +322,7 @@
     "@vscode/codicons": "^0.0.36",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "abi-to-mock": "^1.0.7",
+    "ast-parents": "^0.0.1",
     "case": "^1.6.3",
     "handlebars": "^4.7.8",
     "jsdom": "^26.0.0",

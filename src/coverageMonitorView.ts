@@ -1,24 +1,17 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as parser from '@solidity-parser/parser';
+import * as parser from '@solidity-parser/parser'
+import astParents from 'ast-parents';
 import { getFoundryConfigPath, shouldExclude } from './utils';
-import { ContractCoverage, FunctionLocation } from './types';
+import { ContractCoverage, FunctionLocation, CoverageEntry, CoverageState } from './types';
 
-interface CoverageEntry {
-    line: number;
-    revert: number;
-    success: number;
-}
-
-interface CoverageState {
-    [file: string]: CoverageEntry[];
-}
 
 export class CoverageMonitorProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'recon-coverage-monitor';
     private _view?: vscode.WebviewView | vscode.WebviewPanel;
     private _watcher?: vscode.FileSystemWatcher;
+    private _astWatcher?: vscode.FileSystemWatcher;
     private _lastCoverage: CoverageState = {};
     private _functionLocations: Map<string, FunctionLocation[]> = new Map();
 
@@ -34,8 +27,14 @@ export class CoverageMonitorProvider implements vscode.WebviewViewProvider {
             const foundryRoot = path.dirname(getFoundryConfigPath(workspaceRoot));
             const coveragePath = path.join(foundryRoot, 'medusa/coverage/coverage.json');
 
+            this.loadContractASTs();
+
             this._watcher = vscode.workspace.createFileSystemWatcher(
                 new vscode.RelativePattern(foundryRoot, 'medusa/coverage/coverage.json')
+            );
+
+            this._astWatcher = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(foundryRoot, 'crytic-export/combined_solc.json')
             );
 
             this._watcher.onDidChange(async () => {
@@ -45,36 +44,58 @@ export class CoverageMonitorProvider implements vscode.WebviewViewProvider {
             this._watcher.onDidCreate(async () => {
                 await this.updateCoverage(coveragePath);
             });
+
+            this._astWatcher.onDidDelete(async () => {
+                await this.loadContractASTs();
+            });
         }
     }
 
-    private async loadContractASTs(): Promise<void> {
+    public async loadContractASTs(): Promise<void> {
+        console.log('Loading contract ASTs...');
         if (!vscode.workspace.workspaceFolders) { return; }
 
         const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
         const foundryRoot = path.dirname(getFoundryConfigPath(workspaceRoot));
-        const combinedJsonPath = path.join(foundryRoot, 'crytic-export/combined_solc.json');
 
         try {
-            const content = await fs.promises.readFile(combinedJsonPath, 'utf8');
-            const combined = JSON.parse(content);
+            // Find all .sol files in workspace
+            const solidityFiles = await vscode.workspace.findFiles('**/*.sol');
 
-            for (const [filePath,] of Object.entries(combined.sources)) {
+            for (const uri of solidityFiles) {
+                const filePath = uri.fsPath;
                 const relativePath = path.relative(foundryRoot, filePath);
+
                 if (shouldExclude(relativePath) && !filePath.includes('/recon/')) {
                     continue;
                 }
+
                 const functions: FunctionLocation[] = [];
 
                 try {
-                    const ast = parser.parse(await fs.promises.readFile(filePath, 'utf8'), { loc: true, range: true });
+                    const fileContent = await fs.promises.readFile(filePath, 'utf8');
+                    const contentLines = fileContent.split('\n');
+                    const ast = parser.parse(fileContent, { loc: true, range: true });
+                    astParents(ast);
                     parser.visit(ast, {
-                        FunctionDefinition: (node) => {
-                            if (node.stateMutability !== 'view' && node.stateMutability !== 'pure') {
+                        FunctionDefinition: (node: any) => {
+                            if (node.stateMutability !== 'view' && node.stateMutability !== 'pure' && !node.isConstructor && node.parent && node.parent.type === 'ContractDefinition'&& node.parent.kind !== 'interface') {
+                                const start = node.loc?.start.line || 0;
+                                const end = node.loc?.end.line || 0;
+                                const excludedLines = [];
+                                for (let line = start + 1; line < end - 1; line++) {
+                                    if (contentLines[line].trim().startsWith('//') ||
+                                        contentLines[line].trim() === '' ||
+                                        contentLines[line].trim() === '{' ||
+                                        contentLines[line].trim() === '}') {
+                                        excludedLines.push(line + 1);
+                                    }
+                                }
                                 functions.push({
-                                    name: node.name!,
-                                    startLine: (node.loc?.start.line || 0) + 1,
-                                    endLine: (node.loc?.end.line || 0) - 1,
+                                    name: node.name ? node.name : node.isReceiveEther ? 'receive' : 'fallback',
+                                    startLine: start + 1,
+                                    endLine: end - 1,
+                                    excludedLines: excludedLines,
                                     stateMutability: node.stateMutability!
                                 });
                             }
@@ -89,37 +110,24 @@ export class CoverageMonitorProvider implements vscode.WebviewViewProvider {
                 }
             }
         } catch (e) {
-            console.error('Error loading combined_solc.json:', e);
+            console.error('Error loading Solidity files:', e);
         }
     }
 
     private calculateFunctionCoverage(file: string, entries: CoverageEntry[]): ContractCoverage {
         const functions = this._functionLocations.get(file) || [];
-        // Read the file content to check for lines with only braces
-        let fileContent: string[] = [];
-        try {
-            fileContent = fs.readFileSync(file, 'utf8').split('\n');
-        } catch (e) {
-            console.error(`Error reading file ${file}:`, e);
-        }
-
-        // Filter out lines that only contain curly braces and filter for successful executions
         const coveredLines = new Set(entries
-            .filter(e => {
-                const line = fileContent[e.line - 1];
-                return e.success > 0 && (!line || line.trim() !== '{' && line.trim() !== '}');
-            })
+            .filter(e => e.isCovered)
             .map(e => e.line));
-
         const functionsCoverage = functions.map(fn => {
             let coveredCount = 0;
             for (let line = fn.startLine; line <= fn.endLine; line++) {
-                if (coveredLines.has(line)) {
+                if (coveredLines.has(line) && !fn.excludedLines.includes(line)) {
                     coveredCount++;
                 }
             }
 
-            const totalLines = fn.endLine - fn.startLine + 1;
+            const totalLines = fn.endLine - fn.startLine - fn.excludedLines.length + 1;
             return {
                 name: fn.name,
                 location: fn,
@@ -139,7 +147,6 @@ export class CoverageMonitorProvider implements vscode.WebviewViewProvider {
 
     private async updateCoverage(coveragePath: string) {
         try {
-            await this.loadContractASTs();
             const content = await fs.promises.readFile(coveragePath, 'utf8');
             const newCoverage: CoverageState = JSON.parse(content);
 
@@ -542,5 +549,6 @@ export class CoverageMonitorProvider implements vscode.WebviewViewProvider {
 
     public dispose() {
         this._watcher?.dispose();
+        this._astWatcher?.dispose();
     }
 }
