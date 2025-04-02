@@ -23,7 +23,7 @@ export class SolFileProcessor implements vscode.CodeLensProvider {
 
             // Add CodeLenses for test functions
             for (const func of testFunctions) {
-                if (func.isPublicOrExternal && func.name.startsWith('test_')) {
+                if (func.isPublicOrExternal && func.name.startsWith('test')) {
                     codeLenses.push(
                         new vscode.CodeLens(func.range, {
                             title: '▶ Run Test',
