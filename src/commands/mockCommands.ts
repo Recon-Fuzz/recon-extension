@@ -61,6 +61,9 @@ export function registerMockCommands(
                     // Ensure mocks directory exists and save the file
                     await vscode.workspace.fs.createDirectory(vscode.Uri.file(mocksFolder));
 
+                    // Update settings at workspace level
+                    await vscode.workspace.getConfiguration('recon').update('mocksFolderPath', mocksFolderPath, vscode.ConfigurationTarget.Workspace);
+
                     // Generate mock using abi-to-mock
                     await AbiToMock(
                         abiFilePath,           // Full path to ABI

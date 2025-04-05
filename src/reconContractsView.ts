@@ -37,7 +37,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
 
     private async setShowAllFiles(value: boolean) {
         this.showAllFiles = value;
-        await vscode.workspace.getConfiguration('recon').update('showAllFiles', this.showAllFiles, true);
+        await vscode.workspace.getConfiguration('recon').update('showAllFiles', this.showAllFiles, vscode.ConfigurationTarget.Workspace);
         await vscode.commands.executeCommand('setContext', 'recon.showingAllFiles', this.showAllFiles);
         this._updateWebview();
     }
@@ -1313,7 +1313,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         if (this.contracts.length === 0) {
             return `
                 <div class="no-contracts">
-                    No contracts detected yet.
+                    <p>No contracts detected yet.</p>
                     <vscode-button appearance="secondary" onclick="vscode.postMessage({type: 'build'})">
                         <i class="codicon codicon-gear"></i>
                         Build Project

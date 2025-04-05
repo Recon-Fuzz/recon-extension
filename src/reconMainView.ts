@@ -33,16 +33,16 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     this.selectFoundryConfig();
                     break;
                 case 'updateEchidnaMode':
-                    await vscode.workspace.getConfiguration('recon').update('echidna.mode', message.value, true);
+                    await vscode.workspace.getConfiguration('recon').update('echidna.mode', message.value, vscode.ConfigurationTarget.Workspace);
                     break;
                 case 'updateEchidnaTestLimit':
-                    await vscode.workspace.getConfiguration('recon').update('echidna.testLimit', message.value, true);
+                    await vscode.workspace.getConfiguration('recon').update('echidna.testLimit', message.value, vscode.ConfigurationTarget.Workspace);
                     break;
                 case 'openSettings':
-                    vscode.commands.executeCommand('workbench.action.openSettings', '@ext:Recon-Fuzz.recon');
+                    vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:Recon-Fuzz.recon');
                     break;
                 case 'updateDefaultFuzzer':
-                    await vscode.workspace.getConfiguration('recon').update('defaultFuzzer', message.value, true);
+                    await vscode.workspace.getConfiguration('recon').update('defaultFuzzer', message.value, vscode.ConfigurationTarget.Workspace);
                     this._updateWebview();
                     break;
                 case 'runFuzzer':
@@ -84,7 +84,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
 
         if (selected) {
             const relativePath = vscode.workspace.asRelativePath(selected.file);
-            await vscode.workspace.getConfiguration('recon').update('foundryConfigPath', relativePath, true);
+            await vscode.workspace.getConfiguration('recon').update('foundryConfigPath', relativePath, vscode.ConfigurationTarget.Workspace);
             this._updateWebview();
         }
     }
@@ -289,7 +289,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
         return `
             <div class="not-foundry">
                 <vscode-button appearance="secondary" data-select-config>
-                    <i class="codicon codicon-folder-opened"></i>
+                    <i class="codicon codicon-folder-opened" style="margin-right: 2px;"></i>
                     Select foundry.toml
                 </vscode-button>
                 <p>foundry.toml not found at: ${configPath}<br>Click button to select the file</p>

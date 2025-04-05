@@ -27,6 +27,11 @@
           "id": "recon-cockpit",
           "title": "Recon",
           "icon": "images/icon.svg"
+        },
+        {
+          "id": "recon-pro",
+          "title": "Recon Pro",
+          "icon": "images/icon-pro.svg"
         }
       ]
     },
@@ -47,16 +52,23 @@
           "id": "recon-coverage",
           "name": "Coverage Reports"
         }
+      ],
+      "recon-pro": [
+        {
+          "type": "webview",
+          "id": "recon-pro.jobs",
+          "name": "Jobs",
+          "when": "recon:isPro"
+        },
+        {
+          "type": "webview",
+          "id": "recon-pro-main",
+          "name": "Recon Pro",
+          "when": "!recon:isPro"
+        }
       ]
     },
     "menus": {
-      "view/item/context": [
-        {
-          "command": "recon.clone",
-          "when": "view == recon-c4-ongoing",
-          "group": "inline"
-        }
-      ],
       "view/title": [
         {
           "command": "recon.showAllFiles",
@@ -189,6 +201,7 @@
         "recon.defaultFuzzer": {
           "type": "string",
           "default": "Echidna",
+          "scope": "resource",
           "enum": [
             "Echidna",
             "Medusa"
@@ -199,11 +212,13 @@
         "recon.showAllFiles": {
           "type": "boolean",
           "default": false,
+          "scope": "resource",
           "order": 2,
           "description": "Show all contract files including tests and libraries"
         },
         "recon.echidna.mode": {
           "type": "string",
+          "scope": "resource",
           "order": 3,
           "default": "assertion",
           "enum": [
@@ -219,6 +234,7 @@
           "type": "number",
           "default": 1000000,
           "minimum": 1,
+          "scope": "resource",
           "order": 4,
           "description": "Test limit for Echidna fuzzing"
         },
@@ -226,6 +242,7 @@
           "type": "number",
           "default": 8,
           "minimum": 1,
+          "scope": "resource",
           "order": 5,
           "description": "Number of workers for Echidna fuzzing"
         },
@@ -233,6 +250,7 @@
           "type": "number",
           "default": 0,
           "minimum": 0,
+          "scope": "resource",
           "order": 6,
           "description": "Test limit for Medusa fuzzing"
         },
@@ -240,6 +258,7 @@
           "type": "number",
           "default": 1,
           "minimum": 1,
+          "scope": "resource",
           "order": 7,
           "description": "Number of workers for Medusa fuzzing"
         },
@@ -247,12 +266,14 @@
           "type": "string",
           "default": "foundry.toml",
           "description": "Path to foundry.toml configuration file (relative to workspace root)",
+          "scope": "resource",
           "order": 8
         },
         "recon.forge.buildArgs": {
           "type": "string",
           "default": "",
           "description": "Extra arguments to pass to forge build command (e.g. --via-ir)",
+          "scope": "resource",
           "order": 1
         },
         "recon.forge.testVerbosity": {
@@ -266,24 +287,28 @@
             "-vvvvv"
           ],
           "description": "Verbosity level for forge test command",
+          "scope": "resource",
           "order": 2
         },
         "recon.mocksFolderPath": {
           "type": "string",
           "default": "test/recon/mocks",
           "description": "Path to store generated mock contracts (relative to foundry.toml location)",
+          "scope": "resource",
           "order": 11
         },
         "recon.mockAutoSave": {
           "type": "boolean",
           "default": true,
           "description": "Automatically save generated mock contracts to disk",
+          "scope": "resource",
           "order": 12
         },
         "recon.customTestFolderPath": {
           "type": "string",
           "default": "",
           "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
+          "scope": "resource",
           "order": 13
         }
       }
