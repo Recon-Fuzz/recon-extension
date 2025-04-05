@@ -44,10 +44,15 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
     private async createNewJob(jobData: NewJobRequest): Promise<void> {
         const token = await this.authService.getAccessToken();
-        if (!token) { return; }
+        if (!token) { 
+            vscode.window.showErrorMessage('Authentication token not available');
+            return; 
+        }
 
-        await proxyRequest('POST', '/jobs', token, jobData);
+        console.log('Creating new job with data:', JSON.stringify(jobData, null, 2));
+        // await proxyRequest('POST', '/jobs', token, jobData);
         await this.refreshJobs();
+        vscode.window.showInformationMessage('Job submitted successfully!');
     }
 
     public async resolveWebviewView(
@@ -128,6 +133,10 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 case 'new-job':
                     // Show the modal when new-job message is received
                     this._view?.webview.postMessage({ type: 'showModal' });
+                    break;
+                case 'createNewJob':
+                    // Handle the job creation from the form submission
+                    await this.createNewJob(message.jobData);
                     break;
             }
         });
@@ -455,10 +464,10 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     overflow-y: auto;
                 }
                 .modal-content {
-                    background: var(--vscode-editor-background);
+                    background: var(--vscode-editorWidget-background);
                     padding: 12px;
                     width: 100%;
-                    height: 100%;
+                    height: calc(100% - 24px);
                     overflow-y: auto;
                     border: none;
                 }
@@ -505,7 +514,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 .form-actions {
                     position: sticky;
                     bottom: 0;
-                    background: var(--vscode-editor-background);
                     padding: 16px 0;
                     border-top: 1px solid var(--vscode-widget-border);
                     margin-top: 20px;
@@ -746,6 +754,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     const branchName = document.getElementById('branch-name').value;
                     const directory = document.getElementById('directory').value;
 
+                    // Base job data
                     const jobData = {
                         jobType,
                         orgName,
@@ -754,8 +763,70 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                         directory
                     };
 
+                    // Add job-specific fields based on job type
+                    switch(jobType) {
+                        case 'medusa':
+                            jobData.config = document.getElementById('medusa-config').value;
+                            jobData.timeout = document.getElementById('medusa-timeout').value;
+                            jobData.corpusJobId = document.getElementById('medusa-corpus').value;
+                            jobData.preprocess = document.getElementById('medusa-preprocess').value;
+                            break;
+                        case 'echidna':
+                            jobData.config = document.getElementById('echidna-config').value;
+                            jobData.contract = document.getElementById('echidna-contract').value;
+                            jobData.corpusDir = document.getElementById('echidna-corpus-dir').value;
+                            jobData.testLimit = document.getElementById('echidna-test-limit').value;
+                            jobData.mode = document.getElementById('echidna-mode').value;
+                            jobData.corpusJobId = document.getElementById('echidna-corpus').value;
+                            jobData.forkMode = document.getElementById('echidna-fork').value;
+                            jobData.forkBlockReplacement = document.getElementById('echidna-fork-replacement').checked;
+                            
+                            if (jobData.forkMode === 'CUSTOM') {
+                                jobData.rpcUrl = document.getElementById('echidna-rpc-url').value;
+                            }
+                            
+                            if (jobData.forkMode !== 'NONE') {
+                                jobData.forkBlock = document.getElementById('echidna-fork-block').value;
+                            }
+                            
+                            jobData.preprocess = document.getElementById('echidna-preprocess').value;
+                            break;
+                        case 'foundry':
+                            jobData.contract = document.getElementById('foundry-contract').value;
+                            jobData.runs = document.getElementById('foundry-runs').value;
+                            jobData.seed = document.getElementById('foundry-seed').value;
+                            jobData.testCommand = document.getElementById('foundry-test-command').value;
+                            
+                            if (jobData.testCommand === '--match-test') {
+                                jobData.testTarget = document.getElementById('foundry-test-target').value;
+                            }
+                            
+                            jobData.verbosity = document.getElementById('foundry-verbosity').value;
+                            jobData.forkMode = document.getElementById('foundry-fork').value;
+                            
+                            if (jobData.forkMode !== 'NONE') {
+                                jobData.forkBlock = document.getElementById('foundry-fork-block').value;
+                            }
+                            
+                            jobData.preprocess = document.getElementById('foundry-preprocess').value;
+                            break;
+                        case 'halmos':
+                            jobData.contract = document.getElementById('halmos-contract').value;
+                            jobData.prefix = document.getElementById('halmos-prefix').value;
+                            jobData.array = document.getElementById('halmos-array').value;
+                            jobData.loops = document.getElementById('halmos-loops').value;
+                            jobData.verbosity = document.getElementById('halmos-verbosity').value;
+                            jobData.preprocess = document.getElementById('halmos-preprocess').value;
+                            break;
+                        case 'kontrol':
+                            jobData.test = document.getElementById('kontrol-test').value;
+                            jobData.preprocess = document.getElementById('kontrol-preprocess').value;
+                            break;
+                    }
+
+                    // Send the job data to the extension
                     vscode.postMessage({ 
-                        type: 'new-job',
+                        type: 'createNewJob',
                         jobData: jobData
                     });
 
