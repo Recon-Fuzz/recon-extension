@@ -171,11 +171,20 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             ]);
             this.shares = shares;
 
-            const html = this._getHtmlForWebview(jobs, currentRepo);
-            this._view.webview.html = html;
-
-            // Restore modal state immediately after HTML update
-            this._view.webview.postMessage({ type: 'restoreModalState' });
+            // Instead of refreshing the entire webview, just update the jobs list
+            if (this._view.webview.html) {
+                // If webview is already initialized, just update the jobs list
+                const jobsListHtml = this.renderJobs(jobs, currentRepo);
+                this._view.webview.postMessage({ 
+                    type: 'updateJobsList', 
+                    html: jobsListHtml, 
+                    currentRepo: currentRepo
+                });
+            } else {
+                // First load - initialize the full HTML
+                const html = this._getHtmlForWebview(jobs, currentRepo);
+                this._view.webview.html = html;
+            }
 
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to refresh data: ${error}`);
@@ -533,11 +542,13 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     <i class="codicon codicon-plus"></i>
                 </button>
             </div>
-            <div id="jobs-container">
-                <div class="jobs-list">
-                    ${this.renderJobs(jobs, currentRepo)}
-                </div>
+            
+            <!-- Jobs container - this will be the only part that gets refreshed -->
+            <div id="jobs-container" class="jobs-list">
+                ${this.renderJobs(jobs, currentRepo)}
             </div>
+            
+            <!-- Modal is now outside the jobs container so it won't be affected by refreshes -->
             <div id="new-job-modal" class="modal" style="display: none;">
                 <div class="modal-content">
                     <h4>Create a New Job</h2>
@@ -615,7 +626,11 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 const vscode = acquireVsCodeApi();
                 
                 // Initialize state management
-                const state = vscode.getState() || { modalOpen: false };
+                const state = vscode.getState() || { 
+                    modalOpen: false,
+                    showAllJobs: false,
+                    formData: {}
+                };
 
                 function openUrl(url) {
                     vscode.postMessage({ type: 'openUrl', url });
@@ -658,6 +673,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     vscode.setState(state);
                 }
 
+                // Listen for messages from the extension
                 window.addEventListener('message', event => {
                     const message = event.data;
                     switch (message.type) {
@@ -666,23 +682,28 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                             state.modalOpen = true;
                             vscode.setState(state);
                             break;
-                        case 'restoreModalState':
-                            if (state.modalOpen) {
-                                document.getElementById('new-job-modal').style.display = 'flex';
-                            }
+                        case 'updateJobsList':
+                            // Update only the jobs container content
+                            document.getElementById('jobs-container').innerHTML = message.html;
+                            // After updating the jobs list, reapply the filter
+                            filterJobs(message.currentRepo);
                             break;
                     }
                 });
 
-                let showAllJobs = false;
-                const currentRepo = ${JSON.stringify(currentRepo)};
+                let showAllJobs = state.showAllJobs || false;
+                let currentRepo = ${JSON.stringify(currentRepo)};
 
                 function toggleJobsFilter(checked) {
                     showAllJobs = checked;
+                    state.showAllJobs = checked;
+                    vscode.setState(state);
                     filterJobs();
                 }
 
-                function filterJobs() {
+                function filterJobs(repo) {
+                    // Use the provided repo object or fall back to currentRepo
+                    const repoToFilter = repo || currentRepo;
                     const jobCards = document.querySelectorAll('.job-card');
                     let visibleCount = 0;
 
@@ -690,7 +711,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                         const repoName = card.dataset.repoName;
                         const orgName = card.dataset.orgName;
                         
-                        if (showAllJobs || (repoName === currentRepo.repoName && orgName === currentRepo.orgName)) {
+                        if (showAllJobs || (repoName === repoToFilter.repoName && orgName === repoToFilter.orgName)) {
                             card.style.display = '';
                             visibleCount++;
                         } else {
@@ -776,6 +797,10 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     if (testCommandSelect) {
                         toggleTestTarget(testCommandSelect.value);
                     }
+                    
+                    // Save the selected job type to state
+                    state.formData.jobType = value;
+                    vscode.setState(state);
                 }
 
                 function toggleForkOptions(value) {
@@ -801,13 +826,31 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     }
                 }
 
-                // Restore modal state on initial load
-                if (state.modalOpen) {
-                    document.getElementById('new-job-modal').style.display = 'flex';
-                }
-
-                // Initial filter
-                filterJobs();
+                // Initialize the UI based on saved state
+                document.addEventListener('DOMContentLoaded', () => {
+                    // Restore show all jobs checkbox state
+                    const showAllJobsCheckbox = document.getElementById('show-all-jobs');
+                    if (showAllJobsCheckbox) {
+                        showAllJobsCheckbox.checked = state.showAllJobs;
+                    }
+                    
+                    // Restore modal state
+                    if (state.modalOpen) {
+                        document.getElementById('new-job-modal').style.display = 'flex';
+                    }
+                    
+                    // Restore job type selection if available
+                    if (state.formData && state.formData.jobType) {
+                        const jobTypeSelect = document.getElementById('job-type');
+                        if (jobTypeSelect) {
+                            jobTypeSelect.value = state.formData.jobType;
+                            updateJobForm(state.formData.jobType);
+                        }
+                    }
+                    
+                    // Apply initial filter
+                    filterJobs();
+                });
             </script>
         </body>
         </html>`;
@@ -1004,10 +1047,12 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     <input type="text" id="echidna-fork-block" value="LATEST">
                 </div>
             </div>
-            <label title="This allows Recon to dynamically replace the fork block and timestamp in your tester. Requires the use of Recon specific tags.">
-                <input type="checkbox" id="echidna-fork-replacement">
-                Dynamic Block Replacement
-            </label>
+            <div style="margin-bottom: 8px; padding: 4px 0; margin-left:24px;">
+                <label title="This allows Recon to dynamically replace the fork block and timestamp in your tester. Requires the use of Recon specific tags.">
+                    <input type="checkbox" id="echidna-fork-replacement">
+                    Dynamic Block Replacement
+                </label>
+            </div>
             <div class="form-group">
                 <label>Custom pre-install process:</label>
                 <select id="echidna-preprocess">
