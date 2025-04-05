@@ -2,6 +2,9 @@ export interface FuzzerArgs {
     config?: string;
     contract?: string;
     forkMode?: string;
+    forkBlock?: string;
+    forkReplacement: boolean;
+    rpcUrl?: string;
     testMode?: string;
     corpusDir?: string;
     testLimit?: string;
@@ -38,12 +41,38 @@ export enum EchidnaTestMode {
 }
 
 export interface NewJobRequest {
-    type: JobType;
-    organization: string;
-    repo: string;
+    jobType: JobType;
+    orgName: string;
+    repoName: string;
     ref: string;
     directory?: string;
-    fuzzerArgs: FuzzerArgs;
+    preprocess?: string;
+    label?: string;
+    config?: string;
+    contract?: string;
+    forkMode?: string;
+    forkBlock?: string;
+    forkReplacement: boolean;
+    rpcUrl?: string;
+    testMode?: string;
+    corpusDir?: string;
+    testLimit?: string;
+    mode: string;
+    pathToTester?: string;
+    targetCorpus?: string;
+    timeout?: string;
+    
+    runs?: string;
+    seed?: string;
+    testCommand?: string;
+    testTarget?: string;
+    verbosity?: string;
+
+    halmosArray?: string;
+    halmosLoops?: string;
+    halmosPrefix?: string;
+
+    kontrolTest?: string;
 }
 
 export interface JobMetadata {

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { proxyRequest } from '../pro/utils';
+import { CLIENT_ID, proxyRequest } from '../pro/utils';
 
 export interface AuthState {
     isLoggedIn: boolean;
@@ -7,11 +7,12 @@ export interface AuthState {
 }
 
 export class AuthService {
-    private static readonly CLIENT_ID = 'Iv1.0f964a64e6e49997';
     private static readonly ACCESS_TOKEN_KEY = 'recon.accessToken';
     private currentState: AuthState = { isLoggedIn: false, isPro: false };
     private deviceCodeCheckInterval?: NodeJS.Timeout;
     private isAuthenticating = false;
+    private _onAuthStateChanged = new vscode.EventEmitter<AuthState>();
+    public readonly onAuthStateChanged = this._onAuthStateChanged.event;
 
     constructor(private context: vscode.ExtensionContext) {
         this.currentState = context.globalState.get<AuthState>('authState') || { isLoggedIn: false, isPro: false };
@@ -23,6 +24,9 @@ export class AuthService {
             }),
             vscode.commands.registerCommand('recon.authCancelled', () => {
                 this.handleAuthCancelled();
+            }),
+            vscode.commands.registerCommand('recon.signOut', () => {
+                this.signOut();
             })
         );
 
@@ -67,7 +71,7 @@ export class AuthService {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    client_id: AuthService.CLIENT_ID,
+                    client_id: CLIENT_ID,
                     scope: 'read:user'
                 })
             });
@@ -125,7 +129,7 @@ export class AuthService {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            client_id: AuthService.CLIENT_ID,
+                            client_id: CLIENT_ID,
                             device_code: deviceCode,
                             grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
                         })
@@ -172,7 +176,7 @@ export class AuthService {
         if (!token) {
             throw new Error('No access token found');
         }
-        
+        console.log('Access token received:', token);
         const isProUser = await this.checkProStatus(token);
         
         this.currentState = {
@@ -218,6 +222,7 @@ export class AuthService {
 
     private notifyStateChange(): void {
         vscode.commands.executeCommand('recon.authStateChanged', this.currentState);
+        this._onAuthStateChanged.fire(this.currentState);
     }
 
     public async signOut(): Promise<void> {

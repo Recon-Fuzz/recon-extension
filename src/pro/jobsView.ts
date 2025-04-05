@@ -1,27 +1,46 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 import { AuthService } from '../services/authService';
 import { Job, JobsResponse, Share, SharesResponse, NewJobRequest } from './types';
-import { proxyRequest } from './utils';
+import { proxyRequest, downloadAndExtractCorpus, RECON_URL } from './utils';
+import { getFoundryConfigPath, getTestFolder, getUid, prepareTrace } from '../utils';
+import { Fuzzer } from '@recon-fuzz/log-parser';
 
 export class JobsViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'recon-pro.jobs';
     private _view?: vscode.WebviewView;
     private refreshInterval?: NodeJS.Timeout;
     private shares: Share[] = [];
+    private jobs: Job[] = [];
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly authService: AuthService
     ) {
-        // Start auto-refresh when created
-        this.startAutoRefresh();
+        // Only start auto-refresh based on Pro status
+        this.updateRefreshState();
+        
+        // Listen for auth state changes to update refresh behavior
+        authService.onAuthStateChanged(state => {
+            this.updateRefreshState();
+        });
+    }
+
+    private updateRefreshState() {
+        // Clear any existing interval first
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = undefined;
+        }
+
+        // Only start auto-refresh if user is Pro
+        if (this.authService.getAuthState().isPro) {
+            this.startAutoRefresh();
+        }
     }
 
     private startAutoRefresh() {
-        // Clear any existing interval
-        if (this.refreshInterval) {
-            clearInterval(this.refreshInterval);
-        }
         // Refresh every 30 seconds
         this.refreshInterval = setInterval(() => this.refreshJobs(), 30000);
     }
@@ -44,15 +63,113 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
     private async createNewJob(jobData: NewJobRequest): Promise<void> {
         const token = await this.authService.getAccessToken();
-        if (!token) { 
+        if (!token) {
             vscode.window.showErrorMessage('Authentication token not available');
-            return; 
+            return;
         }
 
-        console.log('Creating new job with data:', JSON.stringify(jobData, null, 2));
-        // await proxyRequest('POST', '/jobs', token, jobData);
-        await this.refreshJobs();
-        vscode.window.showInformationMessage('Job submitted successfully!');
+        try {
+            // First check if repository is accessible
+            const canCloneResponse = await proxyRequest('POST', '/jobs/canclone/', token, {
+                orgName: jobData.orgName,
+                repoName: jobData.repoName
+            });
+
+            const canCloneData = await canCloneResponse.json();
+
+            if (!canCloneData.data?.hasAccess) {
+                // Send error message to webview without closing modal
+                this._view?.webview.postMessage({
+                    type: 'jobCreationError',
+                    message: 'Cannot access this repository. Please make sure the repo exists and if it is private, install the Recon GitHub App first.',
+                    installUrl: 'https://github.com/apps/recon-staging/installations/new/'
+                });
+                return;
+            }
+
+            // If repository is accessible, proceed with job creation
+            const data = {
+                orgName: jobData.orgName,
+                repoName: jobData.repoName,
+                ref: jobData.ref,
+                directory: jobData.directory || '',
+                fuzzerArgs: {},
+                preprocess: jobData.preprocess || '',
+                label: jobData.label || '',
+                recipeId: null
+            }
+            switch (jobData.jobType) {
+                case 'medusa':
+                    data.fuzzerArgs = {
+                        config: jobData.config || '',
+                        timeout: jobData.timeout || '',
+                        targetCorpus: jobData.targetCorpus || '',
+                    };
+                    break;
+                case 'echidna':
+                    data.fuzzerArgs = {
+                        pathToTester: jobData.pathToTester || '',
+                        config: jobData.config || '',
+                        contract: jobData.contract || '',
+                        corpusDir: jobData.corpusDir || '',
+                        testLimit: jobData.testLimit || '',
+                        testMode: jobData.mode || 'config',
+                        targetCorpus: jobData.targetCorpus || '',
+                        forkMode: jobData.forkMode || 'NONE',
+                        rpcUrl: jobData.rpcUrl || '',
+                        forkBlock: jobData.forkBlock || '',
+                        forkReplacement: jobData.forkReplacement || false,
+                    };
+                    break;
+                case 'foundry':
+                    data.fuzzerArgs = {
+                        contract: jobData.contract || '',
+                        runs: jobData.runs || '',
+                        seed: jobData.seed || '',
+                        rpcUrl: jobData.rpcUrl || '',
+                        forkMode: jobData.forkMode || 'NONE',
+                        forkBlock: jobData.forkBlock || '',
+                        verbosity: jobData.verbosity || '-vv',
+                        testCommand: jobData.testCommand || '',
+                        testTarget: jobData.testTarget || '',
+                        preprocess: jobData.preprocess || '',
+                        recipeId: null,
+                    };
+                    break;
+                case 'halmos':
+                    data.fuzzerArgs = {
+                        contract: jobData.contract || '',
+                        verbosity: jobData.verbosity || '-vv',
+                        preprocess: jobData.preprocess || '',
+                        halmosArray: jobData.halmosArray || '',
+                        halmosLoops: jobData.halmosLoops || '',
+                        halmosPrefix: jobData.halmosPrefix || '',
+                    };
+                    break;
+                case 'kontrol':
+                    data.fuzzerArgs = {
+                        preprocess: jobData.preprocess || '',
+                        kontrolTest: jobData.kontrolTest || '',
+                    };
+                    break;
+                default:
+                    throw new Error(`Unknown job type: ${jobData.jobType}`);
+            }
+            await proxyRequest('POST', `/jobs/${jobData.jobType}`, token, data);
+
+            // Close the modal after successful job creation
+            this._view?.webview.postMessage({ type: 'closeModal' });
+
+            await this.refreshJobs();
+            vscode.window.showInformationMessage('Job submitted successfully!');
+        } catch (error) {
+            console.error('Error creating job:', error);
+            this._view?.webview.postMessage({
+                type: 'jobCreationError',
+                message: 'Cannot access this repository. Please make sure the repo exists and if it is private, install the Recon GitHub App first.',
+                installUrl: 'https://github.com/apps/recon-staging/installations/new/'
+            });
+        }
     }
 
     public async resolveWebviewView(
@@ -84,8 +201,48 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 case 'openUrl':
                     vscode.env.openExternal(vscode.Uri.parse(message.url));
                     break;
+                case 'download-corpus':
+                    await this.downloadCorpus(message.url);
+                    break;
                 case 'download-repro':
-                    // Handle download repro logic here
+                    const job = this.jobs.find(s => s.id === message.jobId);
+                    if (!job) {
+                        vscode.window.showWarningMessage('No share found for this job');
+                        return;
+                    }
+                    const item = job.brokenProperties[message.idx];
+                    let fuzzer = job.fuzzer === 'ECHIDNA' ? Fuzzer.ECHIDNA : job.fuzzer === 'MEDUSA' ? Fuzzer.MEDUSA : null;
+                    if (!fuzzer) {
+                        vscode.window.showWarningMessage('Fuzzer not supported for repro download');
+                        return;
+                    }
+                    const repros = prepareTrace(fuzzer, getUid(), item.traces, item.brokenProperty);
+                    try {
+                        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+                            vscode.window.showErrorMessage('Please open a workspace to save reproductions.');
+                            return;
+                        }
+                        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+                        const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
+                        const foundryRoot = path.dirname(foundryConfigPath);
+                        const testFolder = await getTestFolder(workspaceRoot);
+                        const foundryTestPath = path.join(foundryRoot, testFolder, 'recon', 'CryticToFoundry.sol');
+
+                        try {
+                            const existingContent = await fs.readFile(foundryTestPath, 'utf8');
+                            const newContent = existingContent.replace(/}([^}]*)$/, `\n    ${repros}\n}$1`);
+                            await fs.writeFile(foundryTestPath, newContent);
+
+                            const doc = await vscode.workspace.openTextDocument(foundryTestPath);
+                            await vscode.window.showTextDocument(doc);
+                            vscode.window.showInformationMessage('Added reproductions to existing CryticToFoundry.sol');
+                        } catch (e) {
+                            vscode.window.showWarningMessage('Could not find CryticToFoundry.sol. Please create it first.');
+                        }
+                    } catch (error) {
+                        console.error('Error saving reproductions:', error);
+                        vscode.window.showErrorMessage('Failed to save Foundry reproductions');
+                    }
                     break;
                 case 'share-job':
                     let share = this.shares.find(s => s.jobId === message.jobId);
@@ -99,9 +256,9 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                             return;
                         }
                     }
-                    
+
                     if (share) {
-                        const shareUrl = `https://staging.getrecon.xyz/shares/${share.id}`;
+                        const shareUrl = `${RECON_URL}/shares/${share.id}`;
                         await vscode.env.clipboard.writeText(shareUrl);
                         vscode.window.showInformationMessage('Share URL copied to clipboard!');
                     } else {
@@ -121,7 +278,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                         }
                     }
                     if (share2) {
-                        const reportUrl = `https://staging.getrecon.xyz/shares/${share2.id}/report`;
+                        const reportUrl = `${RECON_URL}/shares/${share2.id}/report`;
                         vscode.env.openExternal(vscode.Uri.parse(reportUrl));
                     } else {
                         vscode.window.showWarningMessage('No share found for this job');
@@ -131,15 +288,40 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     await this.stopJob(message.jobId);
                     break;
                 case 'new-job':
-                    // Show the modal when new-job message is received
                     this._view?.webview.postMessage({ type: 'showModal' });
                     break;
                 case 'createNewJob':
-                    // Handle the job creation from the form submission
                     await this.createNewJob(message.jobData);
                     break;
             }
         });
+    }
+
+    private async downloadCorpus(url: string): Promise<void> {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('Please open a workspace to download corpus files.');
+            return;
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+
+        try {
+            vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Downloading corpus...",
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 0 });
+
+                const extractedPath = await downloadAndExtractCorpus(url, workspaceRoot);
+
+                progress.report({ increment: 100 });
+                vscode.window.showInformationMessage(`Corpus downloaded and extracted to ${extractedPath}`);
+            });
+        } catch (error) {
+            console.error('Error downloading corpus:', error);
+            vscode.window.showErrorMessage(`Failed to download corpus: ${error}`);
+        }
     }
 
     dispose() {
@@ -154,6 +336,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
         const response = await proxyRequest('GET', '/jobs', token);
         const data: JobsResponse = await response.json();
+        this.jobs = data.data;
         return data.data;
     }
 
@@ -171,6 +354,11 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
     private async refreshJobs() {
         if (!this._view) { return; }
+        
+        // Double check the user is still Pro before refreshing
+        if (!this.authService.getAuthState().isPro) {
+            return;
+        }
 
         try {
             const [jobs, shares, currentRepo] = await Promise.all([
@@ -180,17 +368,14 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             ]);
             this.shares = shares;
 
-            // Instead of refreshing the entire webview, just update the jobs list
             if (this._view.webview.html) {
-                // If webview is already initialized, just update the jobs list
                 const jobsListHtml = this.renderJobs(jobs, currentRepo);
-                this._view.webview.postMessage({ 
-                    type: 'updateJobsList', 
-                    html: jobsListHtml, 
+                this._view.webview.postMessage({
+                    type: 'updateJobsList',
+                    html: jobsListHtml,
                     currentRepo: currentRepo
                 });
             } else {
-                // First load - initialize the full HTML
                 const html = this._getHtmlForWebview(jobs, currentRepo);
                 this._view.webview.html = html;
             }
@@ -200,31 +385,37 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async getCurrentRepo(): Promise<{orgName: string, repoName: string, ref?: string}> {
+    private async getCurrentRepo(): Promise<{ orgName: string, repoName: string, ref?: string }> {
         const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
-        if (!gitExtension) { return {
-            orgName: '',
-            repoName: '',
-            ref: ''
-        }; }
+        if (!gitExtension) {
+            return {
+                orgName: '',
+                repoName: '',
+                ref: ''
+            };
+        }
 
         const api = gitExtension.getAPI(1);
-        if (!api) { return {
-            orgName: '',
-            repoName: '',
-            ref: ''
-        }; }
+        if (!api) {
+            return {
+                orgName: '',
+                repoName: '',
+                ref: ''
+            };
+        }
 
         const repo = api.repositories[0];
-        if (!repo) { return {
-            orgName: '',
-            repoName: '',
-            ref: ''
-        }; }
+        if (!repo) {
+            return {
+                orgName: '',
+                repoName: '',
+                ref: ''
+            };
+        }
 
         const head = repo.state.HEAD;
         const remote = repo.state.remotes?.[0]?.fetchUrl;
-        
+
         if (!remote) {
             return {
                 orgName: '',
@@ -233,13 +424,8 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             };
         }
 
-        // Parse GitHub URL to extract org and repo name
-        // Handles formats like:
-        // https://github.com/orgName/repoName.git
-        // git@github.com:orgName/repoName.git
         const urlMatch = remote.match(/(?:github\.com[:/])([^/]+)\/([^.]+)(?:\.git)?$/);
         if (!urlMatch) {
-            // If URL doesn't match GitHub format, return just the branch name
             return {
                 ref: '',
                 orgName: '',
@@ -254,7 +440,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
         };
     }
 
-    private _getHtmlForWebview(jobs: Job[], currentRepo: {orgName: string, repoName: string, ref?: string}): string {
+    private _getHtmlForWebview(jobs: Job[], currentRepo: { orgName: string, repoName: string, ref?: string }): string {
         const toolkitUri = this._view?.webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/webview-ui-toolkit', 'dist', 'toolkit.min.js')
         );
@@ -305,10 +491,12 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     padding: 2px 6px;
                     border-radius: 3px;
                 }
+                .status-started { background: rgba(59, 129, 195, 0.8)); }
                 .status-running { background:rgba(204, 156, 23, 0.8); }
                 .status-success { background: rgba(16, 148, 16, 0.8); }
                 .status-failed { background: rgba(235, 55, 23, 0.8); }
                 .status-stopped { background: rgba(119, 119, 119, 0.8); }
+                .status-queued { background: rgba(0, 0, 0, 0.8); }
                 .terminate-btn {
                     display: flex;
                     align-items: center;
@@ -422,12 +610,12 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     align-items: center;
                     justify-content: space-between;
                 }
-                .header-controls {
+                .header-actions {
                     display: flex;
                     align-items: center;
                     gap: 8px;
                 }
-                .add-job-btn {
+                .action-btn {
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -440,9 +628,28 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     cursor: pointer;
                     opacity: 0.8;
                 }
-                .add-job-btn:hover {
+                .action-btn:hover {
                     opacity: 1;
                     background: var(--vscode-toolbar-hoverBackground);
+                }
+                .loading-spinner {
+                    display: inline-block;
+                    width: 14px;
+                    height: 14px;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 50%;
+                    border-top-color: var(--vscode-button-foreground);
+                    animation: spin 1s ease-in-out infinite;
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                .button-content {
+                    min-width: 120px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
                 }
                 .no-jobs {
                     padding: 20px;
@@ -532,12 +739,29 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     margin: 8px 0;
                     padding-left: 20px;
                 }
+                .info-box ul li {
+                    margin-bottom: 4px;
+                }
                 .modal-header {
                     top: 0;
                     background: var(--vscode-editor-background);
                     padding: 16px 0;
                     border-bottom: 1px solid var(--vscode-widget-border);
                     z-index: 10;
+                }
+                .error-message {
+                    color: var(--vscode-errorForeground);
+                    background: var(--vscode-inputValidation-errorBackground);
+                    border: 1px solid var(--vscode-inputValidation-errorBorder);
+                    padding: 8px 12px;
+                    margin: 8px 0;
+                    border-radius: 4px;
+                    display: none;
+                    font-size: 12px;
+                }
+                .error-message a {
+                    color: var(--vscode-textLink-foreground);
+                    text-decoration: underline;
                 }
             </style>
         </head>
@@ -546,22 +770,27 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 <vscode-checkbox id="show-all-jobs" onchange="toggleJobsFilter(this.checked)">
                     Show all jobs
                 </vscode-checkbox>
-                <button class="add-job-btn" onclick="addNewJob()" title="Create new job">
-                    <i class="codicon codicon-plus"></i>
-                </button>
+                <div class="header-actions">
+                    <button class="action-btn" onclick="refresh()" title="Refresh jobs">
+                        <i class="codicon codicon-refresh"></i>
+                    </button>
+                    <button class="action-btn" onclick="addNewJob()" title="Create new job">
+                        <i class="codicon codicon-plus"></i>
+                    </button>
+                </div>
             </div>
             
-            <!-- Jobs container - this will be the only part that gets refreshed -->
             <div id="jobs-container" class="jobs-list">
                 ${this.renderJobs(jobs, currentRepo)}
             </div>
             
-            <!-- Modal is now outside the jobs container so it won't be affected by refreshes -->
             <div id="new-job-modal" class="modal" style="display: none;">
                 <div class="modal-content">
                     <h4>Create a New Job</h2>
-                    <div class="modal-body">
                     
+                    <div id="job-creation-error" class="error-message"></div>
+                    
+                    <div class="modal-body">
                         <div class="info-box">
                             <span><strong>Important:</strong></span>
                             <ul>
@@ -582,6 +811,11 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                             </div>
 
                             <div class="form-group">
+                                <label>Label:</label>
+                                <input type="text" id="label">
+                            </div>
+
+                            <div class="form-group">
                                 <label>Organization:</label>
                                 <input type="text" id="org-name" value="${currentRepo.orgName}">
                             </div>
@@ -598,10 +832,9 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
                             <div class="form-group">
                                 <label>Directory:</label>
-                                <input type="text" id="directory" value="${this.getFoundryDir()}" placeholder="Directory path">
+                                <input type="text" id="directory" value="${this.getFoundryDir()}">
                             </div>
 
-                            <!-- Dynamic form sections -->
                             <div id="medusa-form" class="fuzzer-form">
                                 ${this.getMedusaForm(jobs, currentRepo)}
                             </div>
@@ -624,7 +857,9 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
                             <div class="form-actions">
                                 <vscode-button appearance="secondary" onclick="closeModal()">Cancel</vscode-button>
-                                <vscode-button appearance="primary" onclick="submitJob()">Create Job</vscode-button>
+                                <vscode-button id="submit-job-btn" appearance="primary" onclick="submitJob()">
+                                    <span class="button-content">Create Job</span>
+                                </vscode-button>
                             </div>
                         </form>
                     </div>
@@ -633,7 +868,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             <script>
                 const vscode = acquireVsCodeApi();
                 
-                // Initialize state management
                 const state = vscode.getState() || { 
                     modalOpen: false,
                     showAllJobs: false,
@@ -655,10 +889,18 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     });
                 }
 
-                function downloadRepro(traces) {
+                function downloadRepro(jobId, idx) {
                     vscode.postMessage({ 
                         type: 'download-repro',
-                        traces: traces 
+                        jobId: jobId,
+                        idx: idx
+                    });
+                }
+
+                function downloadCorpus(url) {
+                    vscode.postMessage({ 
+                        type: 'download-corpus',
+                        url: url
                     });
                 }
 
@@ -681,7 +923,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     vscode.setState(state);
                 }
 
-                // Listen for messages from the extension
                 window.addEventListener('message', event => {
                     const message = event.data;
                     switch (message.type) {
@@ -690,11 +931,35 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                             state.modalOpen = true;
                             vscode.setState(state);
                             break;
+                        case 'closeModal':
+                            closeModal();
+                            break;
                         case 'updateJobsList':
-                            // Update only the jobs container content
                             document.getElementById('jobs-container').innerHTML = message.html;
-                            // After updating the jobs list, reapply the filter
                             filterJobs(message.currentRepo);
+                            break;
+                        case 'jobCreationError':
+                            const submitBtn = document.getElementById('submit-job-btn');
+                            if (submitBtn) {
+                                const btnContent = submitBtn.querySelector('.button-content');
+                                btnContent.textContent = 'Create Job';
+                                submitBtn.disabled = false;
+                            }
+                            
+                            const errorDiv = document.getElementById('job-creation-error');
+                            if (errorDiv) {
+                                if (message.installUrl) {
+                                    errorDiv.innerHTML = \`\${message.message} <a href="#" onclick="openUrl('\${message.installUrl}')">Install Recon GitHub App</a>\`;
+                                } else {
+                                    errorDiv.textContent = message.message;
+                                }
+                                errorDiv.style.display = 'block';
+                                
+                                const modalContent = document.querySelector('.modal-content');
+                                if (modalContent) {
+                                    modalContent.scrollTop = 0;
+                                }
+                            }
                             break;
                     }
                 });
@@ -710,7 +975,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 }
 
                 function filterJobs(repo) {
-                    // Use the provided repo object or fall back to currentRepo
                     const repoToFilter = repo || currentRepo;
                     const jobCards = document.querySelectorAll('.job-card');
                     let visibleCount = 0;
@@ -727,7 +991,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                         }
                     });
 
-                    // Show/hide no jobs message
                     const noJobsMsg = document.querySelector('.no-jobs');
                     if (visibleCount === 0) {
                         if (!noJobsMsg) {
@@ -743,43 +1006,69 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
 
                 function closeModal() {
                     document.getElementById('new-job-modal').style.display = 'none';
+                    
+                    const submitBtn = document.getElementById('submit-job-btn');
+                    if (submitBtn) {
+                        const btnContent = submitBtn.querySelector('.button-content');
+                        btnContent.textContent = 'Create Job';
+                        submitBtn.disabled = false;
+                    }
+                    
+                    const errorDiv = document.getElementById('job-creation-error');
+                    if (errorDiv) {
+                        errorDiv.style.display = 'none';
+                    }
+                    
                     state.modalOpen = false;
                     vscode.setState(state);
                 }
 
                 function submitJob() {
+                    const errorDiv = document.getElementById('job-creation-error');
+                    if (errorDiv) {
+                        errorDiv.style.display = 'none';
+                    }
+                    
+                    const submitBtn = document.getElementById('submit-job-btn');
+                    if (submitBtn) {
+                        const btnContent = submitBtn.querySelector('.button-content');
+                        btnContent.innerHTML = '<span class="loading-spinner"></span> Creating...';
+                        submitBtn.disabled = true;
+                    }
+                    
                     const jobType = document.getElementById('job-type').value;
+                    const label = document.getElementById('label').value;
                     const orgName = document.getElementById('org-name').value;
                     const repoName = document.getElementById('repo-name').value;
-                    const branchName = document.getElementById('branch-name').value;
+                    const ref = document.getElementById('branch-name').value;
                     const directory = document.getElementById('directory').value;
 
-                    // Base job data
                     const jobData = {
                         jobType,
+                        label,
                         orgName,
                         repoName,
-                        branchName,
+                        ref,
                         directory
                     };
 
-                    // Add job-specific fields based on job type
                     switch(jobType) {
                         case 'medusa':
                             jobData.config = document.getElementById('medusa-config').value;
                             jobData.timeout = document.getElementById('medusa-timeout').value;
-                            jobData.corpusJobId = document.getElementById('medusa-corpus').value;
+                            jobData.targetCorpus = document.getElementById('medusa-corpus').value;
                             jobData.preprocess = document.getElementById('medusa-preprocess').value;
                             break;
                         case 'echidna':
                             jobData.config = document.getElementById('echidna-config').value;
+                            jobData.pathToTester = document.getElementById('echidna-contract-path').value;
                             jobData.contract = document.getElementById('echidna-contract').value;
                             jobData.corpusDir = document.getElementById('echidna-corpus-dir').value;
                             jobData.testLimit = document.getElementById('echidna-test-limit').value;
                             jobData.mode = document.getElementById('echidna-mode').value;
-                            jobData.corpusJobId = document.getElementById('echidna-corpus').value;
+                            jobData.targetCorpus = document.getElementById('echidna-corpus').value;
                             jobData.forkMode = document.getElementById('echidna-fork').value;
-                            jobData.forkBlockReplacement = document.getElementById('echidna-fork-replacement').checked;
+                            jobData.forkReplacement = document.getElementById('echidna-fork-replacement').checked;
                             
                             if (jobData.forkMode === 'CUSTOM') {
                                 jobData.rpcUrl = document.getElementById('echidna-rpc-url').value;
@@ -812,34 +1101,29 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                             break;
                         case 'halmos':
                             jobData.contract = document.getElementById('halmos-contract').value;
-                            jobData.prefix = document.getElementById('halmos-prefix').value;
-                            jobData.array = document.getElementById('halmos-array').value;
-                            jobData.loops = document.getElementById('halmos-loops').value;
+                            jobData.halmosPrefix = document.getElementById('halmos-prefix').value;
+                            jobData.halmosArray = document.getElementById('halmos-array').value;
+                            jobData.halmosLoops = document.getElementById('halmos-loops').value;
                             jobData.verbosity = document.getElementById('halmos-verbosity').value;
                             jobData.preprocess = document.getElementById('halmos-preprocess').value;
                             break;
                         case 'kontrol':
-                            jobData.test = document.getElementById('kontrol-test').value;
+                            jobData.kontrolTest = document.getElementById('kontrol-test').value;
                             jobData.preprocess = document.getElementById('kontrol-preprocess').value;
                             break;
                     }
 
-                    // Send the job data to the extension
                     vscode.postMessage({ 
                         type: 'createNewJob',
                         jobData: jobData
                     });
-
-                    closeModal();
                 }
 
                 function updateJobForm(value) {
-                    // Hide all forms first
                     document.querySelectorAll('.fuzzer-form').forEach(form => {
                         form.style.display = 'none';
                     });
 
-                    // Show the selected form
                     switch (value) {
                         case 'medusa':
                             document.getElementById('medusa-form').style.display = 'block';
@@ -858,7 +1142,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                             break;
                     }
 
-                    // Update specific form controls
                     const forkSelect = document.getElementById('echidna-fork');
                     if (forkSelect) {
                         toggleForkOptions(forkSelect.value);
@@ -869,48 +1152,42 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                         toggleTestTarget(testCommandSelect.value);
                     }
                     
-                    // Save the selected job type to state
                     state.formData.jobType = value;
                     vscode.setState(state);
                 }
 
                 function toggleForkOptions(value) {
-                    const forkOptions = document.getElementById('fork-options');
                     const rpcUrlGroup = document.getElementById('rpc-url-group');
                     const forkBlockGroup = document.getElementById('fork-block-group');
                     
-                    if (!forkOptions || !rpcUrlGroup || !forkBlockGroup) return;
+                    if (!rpcUrlGroup || !forkBlockGroup) return;
 
                     if (value === 'NONE') {
-                        forkOptions.style.display = 'none';
+                        rpcUrlGroup.style.display = 'none';
+                        forkBlockGroup.style.display = 'none';
                     } else {
-                        forkOptions.style.display = 'block';
-                        rpcUrlGroup.style.display = value === 'CUSTOM' ? 'block' : 'none';
-                        forkBlockGroup.style.display = value !== 'NONE' ? 'block' : 'none';
+                        rpcUrlGroup.style.display = value === 'CUSTOM' ? 'flex' : 'none';
+                        forkBlockGroup.style.display = 'flex';
                     }
                 }
 
                 function toggleTestTarget(value) {
                     const targetGroup = document.getElementById('test-target-group');
                     if (targetGroup) {
-                        targetGroup.style.display = value === '--match-test' ? 'block' : 'none';
+                        targetGroup.style.display = value === '--match-test' ? 'flex' : 'none';
                     }
                 }
 
-                // Initialize the UI based on saved state
                 document.addEventListener('DOMContentLoaded', () => {
-                    // Restore show all jobs checkbox state
                     const showAllJobsCheckbox = document.getElementById('show-all-jobs');
                     if (showAllJobsCheckbox) {
                         showAllJobsCheckbox.checked = state.showAllJobs;
                     }
                     
-                    // Restore modal state
                     if (state.modalOpen) {
                         document.getElementById('new-job-modal').style.display = 'flex';
                     }
                     
-                    // Restore job type selection if available
                     if (state.formData && state.formData.jobType) {
                         const jobTypeSelect = document.getElementById('job-type');
                         if (jobTypeSelect) {
@@ -919,7 +1196,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                         }
                     }
                     
-                    // Apply initial filter
                     filterJobs();
                 });
             </script>
@@ -927,7 +1203,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
         </html>`;
     }
 
-    private renderJobs(jobs: Job[], currentRepo: {orgName: string, repoName: string, ref?: string}): string {
+    private renderJobs(jobs: Job[], currentRepo: { orgName: string, repoName: string, ref?: string }): string {
         if (jobs.length === 0) {
             return `<div class="no-jobs">No jobs found</div>`;
         }
@@ -950,15 +1226,16 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 </div>
                 <div class="job-info">
                     ${job.repoName} (${job.ref}) - ${job.fuzzer}
+                    ${job.createdAt ? `<br>Created: ${new Date(job.createdAt).toLocaleString()}` : ''}
                     ${job.testsDuration ? `<br>Duration: ${job.testsDuration}` : ''}
                     ${job.testsPassed !== null ? `<br>Tests: ${job.testsPassed} passed, ${job.testsFailed} failed` : ''}
                 </div>
                 ${(() => {
-                    const testLimit = parseInt(job.fuzzerArgs.testLimit || '0');
-                    if (testLimit > 0 && job.numberOfTests !== null) {
-                        const isCompleted = job.status === 'SUCCESS' || job.status === 'FAILED' || job.status === 'STOPPED';
-                        const progress = isCompleted ? 100 : Math.min((job.numberOfTests / testLimit) * 100, 100);
-                        return `
+                const testLimit = parseInt(job.fuzzerArgs?.testLimit || '0');
+                if (testLimit > 0 && job.numberOfTests !== null) {
+                    const isCompleted = job.status === 'SUCCESS' || job.status === 'FAILED' || job.status === 'STOPPED';
+                    const progress = isCompleted ? 100 : Math.min((job.numberOfTests / testLimit) * 100, 100);
+                    return `
                             <div class="job-progress">
                                 <div class="job-progress-bar" style="width: ${progress}%; background: ${progress < 100 ? '#5c25d2' : '#2ea043'};"></div>
                             </div>
@@ -966,19 +1243,19 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                                 ${job.numberOfTests.toLocaleString()} / ${testLimit.toLocaleString()} tests (${progress.toFixed(1)}%)
                             </div>
                         `;
-                    }
-                    return '';
-                })()}
+                }
+                return '';
+            })()}
                 ${job.brokenProperties.length > 0 ? `
                     <div class="broken-properties">
                         <div class="job-info">Broken Properties:</div>
-                        ${job.brokenProperties.map(prop => `
+                        ${job.brokenProperties.map((prop, idx) => `
                             <div class="broken-property">
                                 <div class="broken-property-content">
                                     <i class="codicon codicon-error"></i>
                                     <span>${prop.brokenProperty}</span>
                                 </div>
-                                <button class="repro-button" onclick="downloadRepro('${prop.traces}')">
+                                <button class="repro-button" onclick="downloadRepro('${job.id}', ${idx})">
                                     <i class="codicon codicon-cloud-download"></i>
                                     Repro
                                 </button>
@@ -988,7 +1265,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 ` : ''}
                 <div class="job-links">
                     ${job.corpusUrl ? `
-                        <span class="job-link" onclick="openUrl('${job.corpusUrl}')" title="Download Corpus">
+                        <span class="job-link" onclick="downloadCorpus('${job.corpusUrl}')" title="Download Corpus">
                             <i class="codicon codicon-file-zip"></i>
                         </span>
                     ` : ''}
@@ -1016,14 +1293,14 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
     private getFoundryDir(): string {
         const config = vscode.workspace.getConfiguration('recon');
         const foundryPath = config.get<string>('foundryConfigPath', 'foundry.toml');
-        // Remove foundry.toml from the end if it exists
         return foundryPath.replace(/foundry\.toml$/, '');
     }
 
-    private getMedusaForm(jobs: Job[], currentRepo: {orgName: string, repoName: string, ref?: string}): string {
-        const relatedJobs = jobs.filter(j => 
-            j.orgName === currentRepo.orgName && 
-            j.repoName === currentRepo.repoName
+    private getMedusaForm(jobs: Job[], currentRepo: { orgName: string, repoName: string, ref?: string }): string {
+        const relatedJobs = jobs.filter(j =>
+            j.orgName === currentRepo.orgName &&
+            j.repoName === currentRepo.repoName &&
+            j.fuzzer === 'MEDUSA'
         );
 
         return `
@@ -1040,7 +1317,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 <select id="medusa-corpus">
                     <option value="">None</option>
                     ${relatedJobs.map(job => `
-                        <option value="${job.id}">${job.label || job.id}</option>
+                        <option value="${job.id}">${job.label || job.id.substring(0, 4)} - ${new Date(job.createdAt).toLocaleString()}</option>
                     `).join('')}
                 </select>
             </div>
@@ -1054,16 +1331,21 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
         `;
     }
 
-    private getEchidnaForm(jobs: Job[], currentRepo: {orgName: string, repoName: string, ref?: string}): string {
-        const relatedJobs = jobs.filter(j => 
-            j.orgName === currentRepo.orgName && 
-            j.repoName === currentRepo.repoName
+    private getEchidnaForm(jobs: Job[], currentRepo: { orgName: string, repoName: string, ref?: string }): string {
+        const relatedJobs = jobs.filter(j =>
+            j.orgName === currentRepo.orgName &&
+            j.repoName === currentRepo.repoName &&
+            j.fuzzer === 'ECHIDNA'
         );
 
         return `
             <div class="form-group">
                 <label>Config file:</label>
                 <input type="text" id="echidna-config">
+            </div>
+            <div class="form-group">
+                <label>Path To Test Contract:</label>
+                <input type="text" id="echidna-contract-path">
             </div>
             <div class="form-group">
                 <label>Tester Contract Name:</label>
@@ -1092,7 +1374,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                 <select id="echidna-corpus">
                     <option value="">None</option>
                     ${relatedJobs.map(job => `
-                        <option value="${job.id}">${job.label || job.id}</option>
+                        <option value="${job.id}">${job.label || job.id.substring(0, 4)} - ${new Date(job.createdAt).toLocaleString()}</option>
                     `).join('')}
                 </select>
             </div>
@@ -1108,15 +1390,13 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     <option value="BASE">Base</option>
                 </select>
             </div>
-            <div id="fork-options" style="display: none;">
-                <div class="form-group" id="rpc-url-group" style="display: none;">
-                    <label>RPC URL:</label>
-                    <input type="text" id="echidna-rpc-url">
-                </div>
-                <div class="form-group" id="fork-block-group" style="display: none;">
-                    <label>Fork Block:</label>
-                    <input type="text" id="echidna-fork-block" value="LATEST">
-                </div>
+            <div class="form-group" id="rpc-url-group" style="display: none;">
+                <label>RPC URL:</label>
+                <input type="text" id="echidna-rpc-url">
+            </div>
+            <div class="form-group" id="fork-block-group" style="display: none;">
+                <label>Fork Block:</label>
+                <input type="text" id="echidna-fork-block" value="LATEST">
             </div>
             <div style="margin-bottom: 8px; padding: 4px 0; margin-left:24px;">
                 <label title="This allows Recon to dynamically replace the fork block and timestamp in your tester. Requires the use of Recon specific tags.">
@@ -1162,7 +1442,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             <div class="form-group">
                 <label>Select verbosity:</label>
                 <select id="foundry-verbosity">
-                    <option value="">None</option>
                     <option value="-vv">-vv</option>
                     <option value="-vvv">-vvv</option>
                     <option value="-vvvv">-vvvv</option>
@@ -1215,7 +1494,6 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             <div class="form-group">
                 <label>Select verbosity:</label>
                 <select id="halmos-verbosity">
-                    <option value="">None</option>
                     <option value="-vv">-vv</option>
                     <option value="-vvv">-vvv</option>
                     <option value="-vvvv">-vvvv</option>

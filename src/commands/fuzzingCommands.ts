@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
-import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser-experimental';
+import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser';
 import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 

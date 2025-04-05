@@ -1,4 +1,4 @@
-import { echidnaLogsToFunctions, Fuzzer, medusaLogsToFunctions } from '@recon-fuzz/log-parser-experimental';
+import { echidnaLogsToFunctions, Fuzzer, medusaLogsToFunctions } from '@recon-fuzz/log-parser';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -90,7 +90,7 @@ export const prepareTrace = (fuzzer: Fuzzer, prefix: string, trace: string, brok
     const functionName = finalTrace
         .split("() public")[0]
         .replace("function ", "");
-    const forgeCommand = `// forge test --match-test ${functionName} -vv`.replace("\n", "");
+    const forgeCommand = `// forge test --match-test ${functionName} -vvv`.replace("\n", "");
 
     // Add 4 spaces to the beginning of each line in finalTrace
     const indentedTrace = finalTrace
