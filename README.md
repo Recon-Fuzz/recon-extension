@@ -60,7 +60,7 @@ Recon is a VS Code extension that streamlines smart contract testing by providin
 
 1. Open a Foundry project in VS Code
 2. Click on the Recon icon in the activity bar
-3. In the Cockpit view, click "Scaffold" to set up Recon templates
+3. In the Cockpit view, click "Scaffold" to set up a project using the [create-chimera-app](https://github.com/Recon-Fuzz/create-chimera-app/tree/main) template
 4. Select target contracts and functions in the Contracts view
 5. Run Echidna or Medusa from the status bar or Cockpit view
 
