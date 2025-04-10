@@ -404,7 +404,7 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
             };
         }
 
-        const repo = api.repositories[0];
+        const repo = api.repositories.find((r: { rootUri: { path: string | undefined; }; }) => r.rootUri.path === vscode.workspace.workspaceFolders?.[0].uri.path);
         if (!repo) {
             return {
                 orgName: '',
@@ -561,6 +561,12 @@ export class JobsViewProvider implements vscode.WebviewViewProvider {
                     display: flex;
                     align-items: center;
                     gap: 8px;
+                    min-width: 0; /* Enable flex item shrinking */
+                }
+                .broken-property-content span {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 .repro-button {
                     display: flex;

@@ -38,6 +38,15 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                 case 'updateEchidnaTestLimit':
                     await vscode.workspace.getConfiguration('recon').update('echidna.testLimit', message.value, vscode.ConfigurationTarget.Workspace);
                     break;
+                case 'updateEchidnaWorkers':
+                    await vscode.workspace.getConfiguration('recon').update('echidna.workers', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
+                case 'updateMedusaTestLimit':
+                    await vscode.workspace.getConfiguration('recon').update('medusa.testLimit', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
+                case 'updateMedusaWorkers':
+                    await vscode.workspace.getConfiguration('recon').update('medusa.workers', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
                 case 'openSettings':
                     vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:Recon-Fuzz.recon');
                     break;
@@ -263,9 +272,51 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                             });
                         }
                     });
+
+                    // Handle workers changes
+                    document.getElementById('echidna-workers')?.addEventListener('change', (e) => {
+                        const value = parseInt(e.target.value, 10);
+                        if (!isNaN(value) && value >= 1) {
+                            vscode.postMessage({
+                                type: 'updateEchidnaWorkers',
+                                value: value
+                            });
+                        }
+                    });
                     
-                    // Handle fuzzer selection changes
+                    // Handle Medusa test limit changes
+                    document.getElementById('medusa-test-limit')?.addEventListener('change', (e) => {
+                        const value = parseInt(e.target.value, 10);
+                        if (!isNaN(value) && value >= 1) {
+                            vscode.postMessage({
+                                type: 'updateMedusaTestLimit',
+                                value: value
+                            });
+                        }
+                    });
+
+                    // Handle Medusa workers changes
+                    document.getElementById('medusa-workers')?.addEventListener('change', (e) => {
+                        const value = parseInt(e.target.value, 10);
+                        if (!isNaN(value) && value >= 1) {
+                            vscode.postMessage({
+                                type: 'updateMedusaWorkers',
+                                value: value
+                            });
+                        }
+                    });
+
+                    // Update settings visibility based on fuzzer selection
                     document.getElementById('fuzzer-selection')?.addEventListener('change', (e) => {
+                        const echidnaSettings = document.getElementById('echidna-settings');
+                        const medusaSettings = document.getElementById('medusa-settings');
+                        if (e.target.value === '${FuzzerTool.ECHIDNA}') {
+                            echidnaSettings.style.display = '';
+                            medusaSettings.style.display = 'none';
+                        } else {
+                            echidnaSettings.style.display = 'none';
+                            medusaSettings.style.display = '';
+                        }
                         vscode.postMessage({
                             type: 'updateDefaultFuzzer',
                             value: e.target.value
@@ -299,9 +350,12 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
 
     private _getMainContent(): string {
         const config = vscode.workspace.getConfiguration('recon');
-        const defaultFuzzer = config.get('defaultFuzzer', FuzzerTool.ECHIDNA);
+        const defaultFuzzer = config.get('defaultFuzzer') || FuzzerTool.ECHIDNA;
         const echidnaMode = config.get('echidna.mode', EchidnaMode.ASSERTION) as EchidnaMode;
         const echidnaTestLimit = config.get('echidna.testLimit', 1000000);
+        const echidnaWorkers = config.get('echidna.workers', 1);
+        const medusaTestLimit = config.get('medusa.testLimit', 1000000);
+        const medusaWorkers = config.get('medusa.workers', 1);
 
         return `
             <div class="button-container">
@@ -344,6 +398,36 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                             id="echidna-test-limit"
                             type="number"
                             value="${echidnaTestLimit}"
+                            min="1"
+                        ></vscode-text-field>
+                    </div>
+                    <div class="setting-group">
+                        <label>Workers:</label>
+                        <vscode-text-field
+                            id="echidna-workers"
+                            type="number"
+                            value="${echidnaWorkers}"
+                            min="1"
+                        ></vscode-text-field>
+                    </div>
+                </div>
+
+                <div class="settings-container" ${defaultFuzzer !== FuzzerTool.MEDUSA ? 'style="display: none;"' : ''} id="medusa-settings">
+                    <div class="setting-group">
+                        <label>Test Limit:</label>
+                        <vscode-text-field
+                            id="medusa-test-limit"
+                            type="number"
+                            value="${medusaTestLimit}"
+                            min="1"
+                        ></vscode-text-field>
+                    </div>
+                    <div class="setting-group">
+                        <label>Workers:</label>
+                        <vscode-text-field
+                            id="medusa-workers"
+                            type="number"
+                            value="${medusaWorkers}"
                             min="1"
                         ></vscode-text-field>
                     </div>

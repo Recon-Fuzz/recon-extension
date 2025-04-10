@@ -84,6 +84,9 @@ export class AuthService {
                 throw new Error(deviceData.error_description || 'Failed to get device code');
             }
 
+            // Calculate expiration time based on expires_in field (in seconds)
+            const expirationTime = Date.now() + (deviceData.expires_in * 1000);
+
             // Show verification URL and code to user
             const continueButton = 'Copy and Continue';
             const cancelButton = 'Cancel';
@@ -93,8 +96,8 @@ export class AuthService {
             if (selection === continueButton) {
                 await vscode.env.clipboard.writeText(deviceData.user_code);
                 await vscode.env.openExternal(vscode.Uri.parse(deviceData.verification_uri));
-                // Poll for token
-                await this.pollForToken(deviceData.device_code, deviceData.interval);
+                // Poll for token with expiration time
+                await this.pollForToken(deviceData.device_code, deviceData.interval + 1, expirationTime);
             } else if (selection === cancelButton || selection === undefined) {
                 // User cancelled or closed the dialog, notify UI to restore button state
                 this.notifyAuthCancelled();
@@ -113,7 +116,7 @@ export class AuthService {
         vscode.commands.executeCommand('recon.authCancelled');
     }
 
-    private async pollForToken(deviceCode: string, interval: number): Promise<void> {
+    private async pollForToken(deviceCode: string, interval: number, expirationTime: number): Promise<void> {
         return new Promise((resolve, reject) => {
             // Clear any existing interval
             if (this.deviceCodeCheckInterval) {
@@ -122,6 +125,16 @@ export class AuthService {
 
             const pollFn = async () => {
                 try {
+                    // Check if the authentication request has expired
+                    if (Date.now() > expirationTime) {
+                        clearInterval(this.deviceCodeCheckInterval);
+                        this.deviceCodeCheckInterval = undefined;
+                        vscode.window.showErrorMessage('Authentication timed out. Please try again.');
+                        this.notifyAuthCancelled();
+                        reject(new Error('Authentication timed out'));
+                        return;
+                    }
+
                     const response = await fetch('https://github.com/login/oauth/access_token', {
                         method: 'POST',
                         headers: {
@@ -156,6 +169,7 @@ export class AuthService {
 
                     if (data.access_token) {
                         clearInterval(this.deviceCodeCheckInterval);
+                        this.deviceCodeCheckInterval = undefined;
                         console.log('Access token received:', data.access_token);
                         await this.context.secrets.store(AuthService.ACCESS_TOKEN_KEY, data.access_token);
                         await this.validateToken();
@@ -163,6 +177,7 @@ export class AuthService {
                     }
                 } catch (error) {
                     clearInterval(this.deviceCodeCheckInterval);
+                    this.deviceCodeCheckInterval = undefined;
                     reject(error);
                 }
             };

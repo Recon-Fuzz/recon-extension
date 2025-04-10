@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "publisher": "Recon-Fuzz",
   "repository": {
@@ -261,7 +261,7 @@
         },
         "recon.medusa.workers": {
           "type": "number",
-          "default": 1,
+          "default": 10,
           "minimum": 1,
           "scope": "resource",
           "order": 7,
