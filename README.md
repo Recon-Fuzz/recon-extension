@@ -1,7 +1,7 @@
 # Recon - Smart Contract Fuzzing Extension
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c79df2a8-9577-48ab-82e8-4882a0fe7e06" alt="Recon Logo" width="128" height="128">
+  <img src="https://avatars.githubusercontent.com/u/152159338?s=200&v=4" alt="Recon Logo" width="128" height="128">
 </p>
 
 <p align="center">
