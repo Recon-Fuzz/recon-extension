@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
-import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser-experimental';
+import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser';
 import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 
@@ -26,7 +26,7 @@ export function registerFuzzingCommands(
 }
 
 async function runFuzzer(
-    fuzzerType: Fuzzer, 
+    fuzzerType: Fuzzer,
     services: ServiceContainer
 ): Promise<void> {
     if (!vscode.workspace.workspaceFolders) {
@@ -39,7 +39,7 @@ async function runFuzzer(
     const foundryRoot = path.dirname(foundryConfigPath);
 
     let command: string;
-    
+
     if (fuzzerType === Fuzzer.ECHIDNA) {
         const config = vscode.workspace.getConfiguration('recon.echidna');
         const workers = config.get<number>('workers', 8);
@@ -142,7 +142,7 @@ async function runFuzzer(
                                         try {
                                             const testFolder = await getTestFolder(workspaceRoot);
                                             const foundryTestPath = path.join(foundryRoot, testFolder, 'recon', 'CryticToFoundry.sol');
-                                            
+
                                             try {
                                                 const existingContent = await fs.readFile(foundryTestPath, 'utf8');
                                                 const newContent = existingContent.replace(/}([^}]*)$/, `\n    ${repros}\n}$1`);
@@ -220,7 +220,7 @@ async function runFuzzer(
                         const corpusMatch = text.match(/corpus: (\d+)/);
                         const failuresMatch = text.match(/failures: (\d+)\/(\d+)/);
                         const callsMatch = text.match(/calls: (\d+)/);
-                        
+
                         if (corpusMatch && failuresMatch && callsMatch) {
                             const corpus = corpusMatch[1];
                             const [, failures, totalTests] = failuresMatch;

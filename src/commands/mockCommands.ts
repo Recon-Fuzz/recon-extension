@@ -21,7 +21,7 @@ export function registerMockCommands(
                 const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
                 const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
                 const foundryRoot = path.dirname(foundryConfigPath);
-                
+
                 // Get mocks folder path from settings and resolve it relative to foundry root
                 const mocksFolderPath = vscode.workspace.getConfiguration('recon').get<string>('mocksFolderPath', 'test/recon/mocks');
                 const mocksFolder = path.join(foundryRoot, mocksFolderPath);
@@ -30,14 +30,14 @@ export function registerMockCommands(
                 const autoSave = vscode.workspace.getConfiguration('recon').get<boolean>('mockAutoSave', true);
 
                 let abiFilePath: string;
-                
+
                 // Check if this is a Solidity file or a JSON file
                 if (uri.fsPath.endsWith('.sol')) {
                     // Find corresponding JSON ABI file for the Solidity file
                     const solFileName = path.basename(uri.fsPath, '.sol');
                     const outDir = await findOutputDirectory(workspaceRoot);
                     const expectedJsonPath = path.join(outDir, `${solFileName}.sol`, `${solFileName}.json`);
-                    
+
                     try {
                         await fs.access(expectedJsonPath);
                         abiFilePath = expectedJsonPath;
@@ -61,6 +61,9 @@ export function registerMockCommands(
                     // Ensure mocks directory exists and save the file
                     await vscode.workspace.fs.createDirectory(vscode.Uri.file(mocksFolder));
 
+                    // Update settings at workspace level
+                    await vscode.workspace.getConfiguration('recon').update('mocksFolderPath', mocksFolderPath, vscode.ConfigurationTarget.Workspace);
+
                     // Generate mock using abi-to-mock
                     await AbiToMock(
                         abiFilePath,           // Full path to ABI
@@ -78,30 +81,30 @@ export function registerMockCommands(
                     // Generate to a temp file/string and open as unsaved document
                     const tempDir = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, '.recon-temp');
                     await vscode.workspace.fs.createDirectory(vscode.Uri.file(tempDir));
-                    
+
                     // Generate mock to temp location
                     await AbiToMock(
-                        abiFilePath,           
-                        tempDir,           
-                        mockName               
+                        abiFilePath,
+                        tempDir,
+                        mockName
                     );
-                    
+
                     // Read the generated file content
                     const tempMockPath = path.join(tempDir, `${mockName}.sol`);
                     const content = await fs.readFile(tempMockPath, 'utf8');
-                    
+
                     // Create a new untitled document with the mock content
                     const document = await vscode.workspace.openTextDocument({
                         language: 'solidity',
                         content: content
                     });
-                    
+
                     // Show the document
                     await vscode.window.showTextDocument(document);
-                    
+
                     // Delete the temp file
                     await fs.unlink(tempMockPath);
-                    
+
                     vscode.window.showInformationMessage(`Generated mock contract: ${mockName} (not saved)`);
                 }
 

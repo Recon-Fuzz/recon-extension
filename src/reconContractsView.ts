@@ -37,7 +37,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
 
     private async setShowAllFiles(value: boolean) {
         this.showAllFiles = value;
-        await vscode.workspace.getConfiguration('recon').update('showAllFiles', this.showAllFiles, true);
+        await vscode.workspace.getConfiguration('recon').update('showAllFiles', this.showAllFiles, vscode.ConfigurationTarget.Workspace);
         await vscode.commands.executeCommand('setContext', 'recon.showingAllFiles', this.showAllFiles);
         this._updateWebview();
     }
@@ -226,7 +226,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 );
                             }
                             this.saveState();
-                            
+
                             // Return updated contract data without rerendering everything
                             if (message.clientUpdate) {
                                 // We let client handle the UI update
@@ -240,12 +240,12 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         } else {
                             this.collapsedContracts.add(message.contractName);
                         }
-                        
+
                         // Only update the collapsed state without full rerender
                         if (this._view) {
                             this._view.webview.postMessage({
-                                type: 'updatedCollapsedState', 
-                                contractName: message.contractName, 
+                                type: 'updatedCollapsedState',
+                                contractName: message.contractName,
                                 collapsed: this.collapsedContracts.has(message.contractName)
                             });
                             return;
@@ -274,7 +274,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             }
                             // Only save state, don't update webview
                             this.saveState();
-                            
+
                             // Only notify the client that the update was successful
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
@@ -302,7 +302,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         if (contract4) {
                             contract4.separated = message.separated;
                             await this.saveState();
-                            
+
                             // Only notify the client that the update was successful
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
@@ -345,7 +345,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 contract5.functionConfigs = [...message.functionConfigs];
                             }
                             await this.saveState();
-                            
+
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
                                     type: 'batchUpdateSuccess',
@@ -380,7 +380,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             contract.enabledFunctions = [];
         }
         await this.saveState();
-        
+
         // Send targeted update to webview instead of full refresh
         if (this._view) {
             this._view.webview.postMessage({
@@ -392,7 +392,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             });
             return;
         }
-        
+
         // Fall back to full refresh if targeted update fails
         this._updateWebview();
     }
@@ -1313,7 +1313,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         if (this.contracts.length === 0) {
             return `
                 <div class="no-contracts">
-                    No contracts detected yet.
+                    <p>No contracts detected yet.</p>
                     <vscode-button appearance="secondary" onclick="vscode.postMessage({type: 'build'})">
                         <i class="codicon codicon-gear"></i>
                         Build Project

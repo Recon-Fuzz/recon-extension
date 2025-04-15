@@ -45,7 +45,7 @@ function conditionallyAddMemoryLocation(
         return `${type} memory`;
     }
 
-    return type;
+    return internalType || type;
 }
 
 export function registerHelpers(handlebars: typeof Handlebars) {
@@ -127,7 +127,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
                     )
                     .join(", ")}) public ${modifiersStr}{
         ${contractName}.${abi.name}${valueStr}(${abi.inputs
-                    .map((input: ParamDefinition) => input.name)
+                    .map((input: ParamDefinition) => input.name ? input.name : getDefaultValue(input.type))
                     .join(", ")});${mode === 'fail'
                         ? `
         t(false, "${contractName}_${abi.name}");`
@@ -145,12 +145,12 @@ export function registerHelpers(handlebars: typeof Handlebars) {
                     .join(", ")}) public ${modifiersStr}{
         ${hasOutputs ? `${outputs}
         try ${contractName}.${abi.name}${valueStr}(${abi.inputs
-                        .map((input: ParamDefinition) => input.name)
+                        .map((input: ParamDefinition) => input.name ? input.name : getDefaultValue(input.type))
                         .join(", ")}) returns (${returnTypes}) {
             ${assignValues}
         }`
                     : `try ${contractName}.${abi.name}(${abi.inputs
-                        .map((input: ParamDefinition) => input.name)
+                        .map((input: ParamDefinition) => input.name ? input.name : getDefaultValue(input.type))
                         .join(", ")}) {}`
                 } catch {
           ${hasOutputs ? "  " : "  "}t(false, "${contractName}_${abi.name
@@ -159,5 +159,22 @@ export function registerHelpers(handlebars: typeof Handlebars) {
     }`;
         }
     });
+}
+
+function getDefaultValue(type: string) {
+    if(type === "address"){
+        return "address(0)";
+    } else if(type.startsWith("uint") || type.startsWith("int")){
+        return "0";
+    } else if(type === "bool"){
+        return "false";
+    } else if(type === "string"){
+        return '""';
+    } else if(type === "bytes"){
+        return 'bytes("")';
+    } else if(type.startsWith("bytes")){
+        return `${type}("")`;
+    }
+    return '"__HandleMe__"';
 }
 
