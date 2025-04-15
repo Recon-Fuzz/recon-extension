@@ -22,10 +22,10 @@
 
 ## Features
 
-Recon is a VS Code extension that streamlines smart contract testing by providing:
+The Recon extension is a VS Code extension that streamlines smart contract testing by providing:
 
-- **One-click setup**: Automatically install and configure Chimera templates
-- **Integrated fuzzing**: Run Echidna and Medusa directly from VS Code
+- **One-click setup**: Automatically install and configure [Chimera](https://github.com/Recon-Fuzz/chimera) templates
+- **Integrated fuzzing**: Run [Echidna](https://github.com/crytic/echidna) and [Medusa](https://github.com/crytic/medusa) directly from VS Code
 - **Contract explorer**: Browse and select target contracts and functions
 - **Status bar integration**: Quick access to fuzzing tools
 - **Coverage visualization**: View and analyze code coverage from fuzzers
