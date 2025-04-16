@@ -102,6 +102,13 @@
           "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/)",
           "group": "2_workspace"
         }
+      ],
+      "editor/context": [
+        {
+          "command": "recon.generateRepro",
+          "when": "editorHasSelection",
+          "group": "recon"
+        }
       ]
     },
     "commands": [
@@ -197,6 +204,11 @@
       {
         "command": "recon.signOut",
         "title": "Sign Out from Recon Pro",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.generateRepro",
+        "title": "Generate Repro",
         "category": "Recon"
       }
     ],

@@ -5,6 +5,7 @@ import { registerTemplateCommands } from './templateCommands';
 import { registerCoverageCommands } from './coverageCommands';
 import { registerMockCommands } from './mockCommands';
 import { registerTestCommands } from './testCommands';
+import { registerGenerationCommands } from './generationCommands';
 import { ServiceContainer } from '../services/serviceContainer';
 
 export async function registerCommands(
@@ -18,4 +19,5 @@ export async function registerCommands(
     registerCoverageCommands(context, services);
     registerMockCommands(context, services);
     registerTestCommands(context, services);
+    registerGenerationCommands(context, services);
 }
