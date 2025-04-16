@@ -75,7 +75,8 @@ async function runFuzzer(
             childProcess = require('child_process').spawn(command, {
                 cwd: foundryRoot,
                 shell: true,
-                detached: true
+                detached: true,
+                ...(process.platform !== 'win32' && { stdio: 'pipe' })
             });
 
             // Handle graceful shutdown
@@ -92,8 +93,12 @@ async function runFuzzer(
                             );
                         } else {
                             if (reason === 'stopped by user') {
-                                process.kill(-childProcess.pid, 'SIGINT');
-                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                if (fuzzerType === Fuzzer.MEDUSA) {
+                                    process.kill(-childProcess.pid, 'SIGINT');
+                                } else {
+                                    process.kill(-childProcess.pid, 'SIGTERM');
+                                }
+                                await new Promise(resolve => setTimeout(resolve, 5000));
                                 if (!processCompleted) {
                                     process.kill(-childProcess.pid, 'SIGKILL');
                                 }
