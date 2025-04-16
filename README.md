@@ -44,6 +44,8 @@ The Recon extension is a VS Code extension that streamlines smart contract testi
 
 ### Install from VS Code Marketplace
 
+Official Link: https://marketplace.visualstudio.com/items?itemName=Recon-Fuzz.recon
+
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
 3. Search for "Recon"
