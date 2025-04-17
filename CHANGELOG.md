@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.19] - 18.04.2025
+## [0.0.19] - 17.04.2025
 
 ### Fixed
 - Contract watcher now correctly tracks individual file changes in output folder
