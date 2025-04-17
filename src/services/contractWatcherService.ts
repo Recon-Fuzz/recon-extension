@@ -6,6 +6,7 @@ import { ReconContractsViewProvider } from '../reconContractsView';
 
 export class ContractWatcherService {
     private watcher: vscode.FileSystemWatcher | undefined;
+    private folderWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor(
         private contractsProvider: ReconContractsViewProvider,
@@ -21,13 +22,19 @@ export class ContractWatcherService {
 
         // Create watcher for just the output directory in workspace root
         this.watcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(workspaceRoot, `${relativePath}/**/*.json`),
+            false, true, false
+        );
+
+        this.folderWatcher = vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(workspaceRoot, relativePath),
-            false, false, false
+            false, true, false
         );
 
         this.context.subscriptions.push(this.watcher);
+        this.context.subscriptions.push(this.folderWatcher);
 
-        // Watch for directory existence changes only
+        // Watch for json files changes
         this.watcher.onDidCreate(() => {
             this.checkAndLoadContracts();
         });
@@ -35,6 +42,14 @@ export class ContractWatcherService {
             this.contractsProvider.setContracts([]);
         });
 
+        // Watch for directory existence changes only
+        this.folderWatcher.onDidCreate(() => {
+            this.checkAndLoadContracts();
+        });
+
+        this.folderWatcher.onDidDelete(() => {
+            this.contractsProvider.setContracts([]);
+        });
         // Check contracts on initialization
         await this.checkAndLoadContracts();
     }

@@ -1300,15 +1300,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return this.getMutableFunctions(contract.abi).length > 0;
     }
 
-    private areAllContractsSelected(): boolean {
-        const visibleContracts = this.contracts.filter(
-            contract =>
-                this.hasMutableFunctions(contract) &&
-                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('lib/') && !contract.path.startsWith('script/')))
-        );
-        return visibleContracts.length > 0 && visibleContracts.every(c => c.enabled);
-    }
-
     private getContractsHtml(): string {
         if (this.contracts.length === 0) {
             return `
@@ -1325,7 +1316,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         const visibleContracts = this.contracts
             .filter(contract =>
                 this.hasMutableFunctions(contract) &&
-                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
+                (this.showAllFiles || (contract.name.includes("Mock") && (contract.path.startsWith('test/') || contract.path.startsWith('src/test/'))) || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
             )
             .sort((a, b) => {
                 const aDepth = a.path.split('/').length;

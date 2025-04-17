@@ -72,6 +72,7 @@ export function registerMockCommands(
                     );
 
                     vscode.window.showInformationMessage(`Generated mock contract: ${mockName}`);
+                    vscode.window.showInformationMessage(`Please build the project to see the generated mock in the contracts explorer.`);
 
                     // Open the generated mock file
                     const mockPath = vscode.Uri.file(mockFilePath);
