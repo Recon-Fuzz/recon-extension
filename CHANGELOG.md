@@ -1,9 +1,9 @@
-# Change Log
+# Changelog
 
-All notable changes to the "recon" extension will be documented in this file.
+## [0.0.18] - 2024
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+### Fixed
+- Coverage report compatibility with new Medusa report format
+- Issue with fuzzer not stopping
 
-## [Unreleased]
-
-- Initial release
+[0.0.18]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.18
