@@ -71,12 +71,28 @@ async function runFuzzer(
         title: fuzzerType === Fuzzer.ECHIDNA ? 'Echidna' : 'Medusa',
         cancellable: true
     }, async (progress, token) => {
+
+        function getEnvironmentPath(): string {
+            const platformKey = process.platform === 'win32'
+                ? 'terminal.integrated.env.windows'
+                : process.platform === 'darwin'
+                ? 'terminal.integrated.env.osx'
+                : 'terminal.integrated.env.linux';
+        
+            const userPath = vscode.workspace.getConfiguration(platformKey).get<string>('PATH');
+            return userPath ? `${userPath}:${process.env.PATH}` : process.env.PATH || '';
+        }
+        
         return new Promise<void>((resolve, reject) => {
             childProcess = require('child_process').spawn(command, {
                 cwd: foundryRoot,
                 shell: true,
                 detached: true,
-                ...(process.platform !== 'win32' && { stdio: 'pipe' })
+                ...(process.platform !== 'win32' && { stdio: 'pipe' }),
+                env: {
+                    ...process.env,
+                    PATH: getEnvironmentPath()
+                }
             });
 
             // Handle graceful shutdown
