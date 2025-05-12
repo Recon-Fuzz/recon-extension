@@ -8,10 +8,8 @@ import { SolFileProcessor } from './solFileProcessor';
 import { OutputService } from './services/outputService';
 import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
-import * as fs from 'fs/promises';
-import { getFoundryConfigPath, outputDirectoryExist } from './utils';
 
-export async function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {   
     // Create services
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
@@ -32,7 +30,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Create and setup contract watcher
     const contractWatcherService = new ContractWatcherService(reconContractsProvider, context);
-    await contractWatcherService.initializeWatcher();
+    // await contractWatcherService.initializeWatcher();
 
     // Register CodeLens provider
     const codeLensProvider = new SolFileProcessor(reconContractsProvider);
@@ -53,6 +51,8 @@ export async function activate(context: vscode.ExtensionContext) {
         contractWatcherService,
         workspaceService
     });
+    vscode.commands.executeCommand('recon.refreshContracts');
+    vscode.commands.executeCommand('recon.refreshCoverage');
 
     // Check if we need to build the project automatically
     // if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) {

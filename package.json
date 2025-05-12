@@ -64,6 +64,11 @@
           "group": "navigation"
         },
         {
+          "command": "recon.refreshContracts",
+          "when": "view == recon-contracts",
+          "group": "navigation"
+        },
+        {
           "command": "recon.hideAllFiles",
           "when": "view == recon-contracts && recon.showingAllFiles",
           "group": "navigation"
@@ -121,6 +126,11 @@
         "command": "recon.showAllFiles",
         "title": "Show All Files",
         "icon": "$(eye)"
+      },
+      {
+        "command": "recon.refreshContracts",
+        "title": "Refresh Contracts",
+        "icon": "$(refresh)"
       },
       {
         "command": "recon.hideAllFiles",

@@ -61,6 +61,7 @@ export function registerBuildCommands(
                             if (!token.isCancellationRequested) {
                                 outputChannel.appendLine('Build completed successfully');
                                 vscode.window.showInformationMessage('Build completed successfully');
+                                vscode.commands.executeCommand('recon.refreshContracts');
                                 services.contractWatcherService.checkAndLoadContracts();
                                 resolve(stdout);
                             }
@@ -75,6 +76,13 @@ export function registerBuildCommands(
                     });
                 });
             });
+        })
+    );
+
+    // Register refresh contracts command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.refreshContracts', () => {
+            services.contractWatcherService.checkAndLoadContracts();
         })
     );
 }

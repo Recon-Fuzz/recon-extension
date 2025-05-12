@@ -30,6 +30,12 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this._extensionUri]
         };
 
+        webviewView.onDidChangeVisibility(() => {
+            if(webviewView.visible) {
+                vscode.commands.executeCommand('recon.refreshCoverage');
+            }
+        });
+
         webviewView.webview.html = await this._getHtmlForWebview();
 
         webviewView.webview.onDidReceiveMessage(async message => {

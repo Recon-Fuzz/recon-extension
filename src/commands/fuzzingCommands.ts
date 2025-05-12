@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { exec } from 'child_process';
 import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser';
 import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid, getEnvironmentPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
@@ -101,10 +100,6 @@ async function runFuzzer(
                                     process.kill(-childProcess.pid, 'SIGINT');
                                 } else {
                                     process.kill(-childProcess.pid, 'SIGTERM');
-                                }
-                                await new Promise(resolve => setTimeout(resolve, 5000));
-                                if (!processCompleted) {
-                                    process.kill(-childProcess.pid, 'SIGKILL');
                                 }
                             }
                         }
