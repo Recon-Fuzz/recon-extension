@@ -53,23 +53,6 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     vscode.commands.executeCommand('recon.refreshContracts');
     vscode.commands.executeCommand('recon.refreshCoverage');
-
-    // Check if we need to build the project automatically
-    // if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) {
-    //     const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-    //     try {
-    //         const foundryConfigPath = getFoundryConfigPath(workspacePath);
-    //         await fs.access(foundryConfigPath);
-
-    //         // foundry.toml exists, check output directory
-    //         const exists = await outputDirectoryExist(workspacePath);
-    //         if (!exists) {
-    //             vscode.commands.executeCommand('recon.buildProject');
-    //         }
-    //     } catch {
-    //         // foundry.toml doesn't exist, do nothing
-    //     }
-    // }
 }
 
 export function deactivate() {}

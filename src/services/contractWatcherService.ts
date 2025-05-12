@@ -12,47 +12,6 @@ export class ContractWatcherService {
         private context: vscode.ExtensionContext
     ) { }
 
-    // public async initializeWatcher(): Promise<void> {
-    //     if (!vscode.workspace.workspaceFolders) { return; }
-
-    //     const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-    //     const outPath = await findOutputDirectory(workspaceRoot);
-    //     const relativePath = path.relative(workspaceRoot, outPath);
-
-    //     // Create watcher for just the output directory in workspace root
-    //     this.watcher = vscode.workspace.createFileSystemWatcher(
-    //         new vscode.RelativePattern(workspaceRoot, `${relativePath}/**/*.json`),
-    //         false, true, false
-    //     );
-
-    //     this.folderWatcher = vscode.workspace.createFileSystemWatcher(
-    //         new vscode.RelativePattern(workspaceRoot, relativePath),
-    //         false, true, false
-    //     );
-
-    //     this.context.subscriptions.push(this.watcher);
-    //     this.context.subscriptions.push(this.folderWatcher);
-
-    //     // Watch for json files changes
-    //     this.watcher.onDidCreate(() => {
-    //         this.checkAndLoadContracts();
-    //     });
-    //     this.watcher.onDidDelete(() => {
-    //         this.contractsProvider.setContracts([]);
-    //     });
-
-    //     // Watch for directory existence changes only
-    //     this.folderWatcher.onDidCreate(() => {
-    //         this.checkAndLoadContracts();
-    //     });
-
-    //     this.folderWatcher.onDidDelete(() => {
-    //         this.contractsProvider.setContracts([]);
-    //     });
-    //     // Check contracts on initialization
-    //     await this.checkAndLoadContracts();
-    // }
-
     public async checkAndLoadContracts(): Promise<void> {
         if (!vscode.workspace.workspaceFolders) { return; }
 
