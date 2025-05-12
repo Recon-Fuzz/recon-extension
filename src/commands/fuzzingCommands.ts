@@ -109,6 +109,13 @@ async function runFuzzer(
                         // Generate report if we have enough data
                         if (hasEnoughData) {
                             try {
+                                if (fuzzerType === Fuzzer.ECHIDNA) {
+                                    let splitOutput = output.split('Stopping.');
+                                    if (splitOutput.length > 1) {
+                                        splitOutput = splitOutput.slice(1);
+                                        output = splitOutput.join('Stopping.');
+                                    }
+                                }
                                 const results = processLogs(output, fuzzerType);
                                 const reportContent = generateJobMD(
                                     fuzzerType,
