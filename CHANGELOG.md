@@ -5,6 +5,9 @@
 ### Fixed
 - Issue with PATH
 - Overloaded functions in mock (functions with same name)
+- Memory issue because of output folder watchers
+- Better Echidna repro (using shrunken version)
+- Refresh contracts button
 
 ## [0.0.19] - 17.04.2025
 
