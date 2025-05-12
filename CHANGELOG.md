@@ -3,7 +3,7 @@
 ## [0.0.20] - 12.05.2025
 
 ### Fixed
-- Issue with PATH
+- Issue with PATH - (h/t: @SethTenenbaum)
 - Overloaded functions in mock (functions with same name)
 - Memory issue because of output folder watchers
 - Better Echidna repro (using shrunken version)
