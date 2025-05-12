@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
 import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser';
-import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid } from '../utils';
+import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid, getEnvironmentPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 
 export function registerFuzzingCommands(
@@ -76,7 +76,11 @@ async function runFuzzer(
                 cwd: foundryRoot,
                 shell: true,
                 detached: true,
-                ...(process.platform !== 'win32' && { stdio: 'pipe' })
+                ...(process.platform !== 'win32' && { stdio: 'pipe' }),
+                env: {
+                    ...process.env,
+                    PATH: getEnvironmentPath()
+                }
             });
 
             // Handle graceful shutdown

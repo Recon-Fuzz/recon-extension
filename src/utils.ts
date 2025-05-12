@@ -239,3 +239,14 @@ export async function cleanupCoverageReport(workspaceRoot: string, content: stri
         return cleanupEchidnaCoverageReport(workspaceRoot, content);
     }
 }
+
+export function getEnvironmentPath(): string {
+    const platformKey = process.platform === 'win32'
+        ? 'terminal.integrated.env.windows'
+        : process.platform === 'darwin'
+            ? 'terminal.integrated.env.osx'
+            : 'terminal.integrated.env.linux';
+
+    const userPath = vscode.workspace.getConfiguration(platformKey).get<string>('PATH');
+    return userPath ? `${userPath}:${process.env.PATH}` : process.env.PATH || '';
+}
