@@ -4,6 +4,7 @@
 
 ### Fixed
 - Issue with PATH
+- Overloaded functions in mock (functions with same name)
 
 ## [0.0.19] - 17.04.2025
 
