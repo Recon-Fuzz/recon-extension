@@ -489,10 +489,10 @@
     "@microsoft/fast-react-wrapper" "^0.3.22"
     tslib "^2.6.2"
 
-abi-to-mock@^1.0.7:
-  version "1.0.7"
-  resolved "https://registry.npmjs.org/abi-to-mock/-/abi-to-mock-1.0.7.tgz"
-  integrity sha512-uHbDwmzy0hJhthRllSAt2eAvsm7so2sVteXkvxgkL/6arfAs6ZcWWW4i5HyKeD6eUSBx0inyK2PWzvOVu7HDdQ==
+abi-to-mock@^1.0.10:
+  version "1.0.10"
+  resolved "https://registry.yarnpkg.com/abi-to-mock/-/abi-to-mock-1.0.10.tgz#68273ac4b540408051af132d8a5f03a8805949f9"
+  integrity sha512-TTU98V9DM92WyaByxmrIBo+bVhwP+DxCzwCYL3GIXvmAdn7D1gBYXh8NaEhU/dXEsLZzs3iOAvcli6zbZgkeiQ==
   dependencies:
     handlebars "^4.7.8"
     yargs "^17.7.2"
