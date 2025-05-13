@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { exec } from 'child_process';
-import { getFoundryConfigPath } from '../utils';
+import { getEnvironmentPath, getFoundryConfigPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 
 export function registerBuildCommands(
@@ -36,7 +36,13 @@ export function registerBuildCommands(
             }, async (progress, token) => {
                 return new Promise((resolve, reject) => {
                     const buildProcess = exec(`forge build ${extraBuildArgs}`.trim(),
-                        { cwd: foundryRoot },
+                        {
+                            cwd: foundryRoot,
+                            env: {
+                                ...process.env,
+                                PATH: getEnvironmentPath()
+                            }
+                        },
                         (error, stdout, stderr) => {
                             if (error && !token.isCancellationRequested) {
                                 const errorMsg = `Build failed: ${error.message}`;
@@ -55,6 +61,7 @@ export function registerBuildCommands(
                             if (!token.isCancellationRequested) {
                                 outputChannel.appendLine('Build completed successfully');
                                 vscode.window.showInformationMessage('Build completed successfully');
+                                vscode.commands.executeCommand('recon.refreshContracts');
                                 services.contractWatcherService.checkAndLoadContracts();
                                 resolve(stdout);
                             }
@@ -69,6 +76,13 @@ export function registerBuildCommands(
                     });
                 });
             });
+        })
+    );
+
+    // Register refresh contracts command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.refreshContracts', () => {
+            services.contractWatcherService.checkAndLoadContracts();
         })
     );
 }

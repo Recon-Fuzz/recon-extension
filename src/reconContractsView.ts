@@ -173,6 +173,12 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this._extensionUri]
         };
 
+        webviewView.onDidChangeVisibility(() => {
+            if(webviewView.visible) {
+                vscode.commands.executeCommand('recon.refreshContracts');
+            }
+        });
+
         webviewView.webview.onDidReceiveMessage(async message => {
             try {
                 switch (message.type) {

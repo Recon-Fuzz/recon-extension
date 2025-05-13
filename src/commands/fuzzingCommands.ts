@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { exec } from 'child_process';
 import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser';
-import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid } from '../utils';
+import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid, getEnvironmentPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 
 export function registerFuzzingCommands(
@@ -76,7 +75,11 @@ async function runFuzzer(
                 cwd: foundryRoot,
                 shell: true,
                 detached: true,
-                ...(process.platform !== 'win32' && { stdio: 'pipe' })
+                ...(process.platform !== 'win32' && { stdio: 'pipe' }),
+                env: {
+                    ...process.env,
+                    PATH: getEnvironmentPath()
+                }
             });
 
             // Handle graceful shutdown
@@ -98,10 +101,6 @@ async function runFuzzer(
                                 } else {
                                     process.kill(-childProcess.pid, 'SIGTERM');
                                 }
-                                await new Promise(resolve => setTimeout(resolve, 5000));
-                                if (!processCompleted) {
-                                    process.kill(-childProcess.pid, 'SIGKILL');
-                                }
                             }
                         }
 
@@ -110,6 +109,13 @@ async function runFuzzer(
                         // Generate report if we have enough data
                         if (hasEnoughData) {
                             try {
+                                if (fuzzerType === Fuzzer.ECHIDNA) {
+                                    let splitOutput = output.split('Stopping.');
+                                    if (splitOutput.length > 1) {
+                                        splitOutput = splitOutput.slice(1);
+                                        output = splitOutput.join('Stopping.');
+                                    }
+                                }
                                 const results = processLogs(output, fuzzerType);
                                 const reportContent = generateJobMD(
                                     fuzzerType,
