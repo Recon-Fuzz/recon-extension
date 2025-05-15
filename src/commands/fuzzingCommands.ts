@@ -106,6 +106,16 @@ async function runFuzzer(
 
                         outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
 
+                        // Wait for "Saving test reproducers" for Echidna
+                        if (fuzzerType === Fuzzer.ECHIDNA) {
+                            // Wait for "Saving test reproducers" with 1 minute timeout
+                            let waited = 0;
+                            while (waited < 60000 && !output.includes("Saving test reproducers")) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                waited += 1000;
+                            }
+                        }
+
                         // Generate report if we have enough data
                         if (hasEnoughData) {
                             try {
