@@ -4,6 +4,7 @@
 
 ### Fixed
 - Waiting for Echidna process to exit completely (with maximum of 60 seconds)
+- Upgrade packages to latest versions
 
 ## [0.0.20] - 12.05.2025
 
