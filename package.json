@@ -343,7 +343,7 @@
     "case": "^1.6.3",
     "echidna-coverage-parser": "^1.0.1",
     "handlebars": "^4.7.8",
-    "jsdom": "^26.0.0",
+    "jsdom": "^26.1.0",
     "yaml": "^2.7.1"
   }
 }
