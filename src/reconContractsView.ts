@@ -102,16 +102,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private debouncedSaveState() {
-        if (this.saveStateTimeout) {
-            clearTimeout(this.saveStateTimeout);
-        }
-
-        this.saveStateTimeout = setTimeout(async () => {
-            await this.saveState();
-        }, 500); // 500ms debounce
-    }
-
     public async loadState() {
         try {
             const reconJson = await this.loadReconJson();
@@ -174,7 +164,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         };
 
         webviewView.onDidChangeVisibility(() => {
-            if(webviewView.visible) {
+            if (webviewView.visible) {
                 vscode.commands.executeCommand('recon.refreshContracts');
             }
         });
@@ -362,8 +352,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                         break;
                 }
-                // Use debounced save for all state changes
-                this.debouncedSaveState();
             } catch (e) {
                 console.error('Error handling webview message:', e);
             }
@@ -1417,16 +1405,16 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return `
             <div class="functions-list">
                 ${functions.map(fn => {
-                    const signature = this.getFunctionSignature(fn);
-                    // Find existing config or use default only if no config exists
-                    const config = contract.functionConfigs?.find(f => f.signature === signature) ?? {
-                        signature,
-                        actor: Actor.ACTOR,
-                        mode: Mode.NORMAL
-                    };
-                    const isEnabled = contract.enabledFunctions?.includes(signature);
+            const signature = this.getFunctionSignature(fn);
+            // Find existing config or use default only if no config exists
+            const config = contract.functionConfigs?.find(f => f.signature === signature) ?? {
+                signature,
+                actor: Actor.ACTOR,
+                mode: Mode.NORMAL
+            };
+            const isEnabled = contract.enabledFunctions?.includes(signature);
 
-                    return `
+            return `
                         <div class="function-item">
                             <div class="function-header">
                                 <vscode-checkbox
@@ -1485,7 +1473,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             ` : ''}
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
     }

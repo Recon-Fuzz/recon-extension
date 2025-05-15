@@ -114,6 +114,13 @@ async function runFuzzer(
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                                 waited += 1000;
                             }
+                        } else if (fuzzerType === Fuzzer.MEDUSA) {
+                            // Wait for "Test summary:" with 1 minute timeout
+                            let waited = 0;
+                            while (waited < 60000 && !output.includes("Test summary:")) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                waited += 1000;
+                            }
                         }
 
                         // Generate report if we have enough data
