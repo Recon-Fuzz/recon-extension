@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { JSDOM } from 'jsdom';
 import { FileBlock } from './types';
+import { execSync } from 'child_process';
 
 export function getFoundryConfigPath(workspaceRoot: string): string {
     const configPath = vscode.workspace.getConfiguration('recon').get<string>('foundryConfigPath', 'foundry.toml');
@@ -241,12 +242,35 @@ export async function cleanupCoverageReport(workspaceRoot: string, content: stri
 }
 
 export function getEnvironmentPath(): string {
-    const platformKey = process.platform === 'win32'
-        ? 'terminal.integrated.env.windows'
-        : process.platform === 'darwin'
-            ? 'terminal.integrated.env.osx'
-            : 'terminal.integrated.env.linux';
+    const defaultPath = process.env.PATH || '';
 
-    const userPath = vscode.workspace.getConfiguration(platformKey).get<string>('PATH');
-    return userPath ? `${userPath}:${process.env.PATH}` : process.env.PATH || '';
+    const platformKey =
+        process.platform === 'win32'
+            ? 'terminal.integrated.env.windows'
+            : process.platform === 'darwin'
+                ? 'terminal.integrated.env.osx'
+                : 'terminal.integrated.env.linux';
+
+    const userPath = vscode.workspace.getConfiguration().get<{ [key: string]: string }>(platformKey)?.PATH || '';
+
+    let shellPath = '';
+    if (process.platform !== 'win32') {
+        try {
+            shellPath = execSync(`${process.env.SHELL || '/bin/bash'} -ilc 'echo $PATH'`, {
+                encoding: 'utf8'
+            }).trim();
+        } catch (e) {
+            console.warn('Failed to get shell PATH:', e);
+        }
+    } else {
+        return userPath ? `${userPath}:${process.env.PATH}` : process.env.PATH || '';
+    }
+
+    const combined = new Set([
+        ...userPath.split(':'),
+        ...shellPath.split(':'),
+        ...defaultPath.split(':'),
+    ].filter(Boolean));
+
+    return Array.from(combined).join(':');
 }
