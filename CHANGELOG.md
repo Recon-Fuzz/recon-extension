@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.23] - 26.05.2025
+
+### Fixed
+- Load the PATH env variable correctly
+
 ## [0.0.22] - 15.05.2025
 
 ### Fixed
@@ -32,6 +37,7 @@
 - Coverage report compatibility with new Medusa report format
 - Issue with fuzzer not stopping
 
+[0.0.23]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.23
 [0.0.22]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.22
 [0.0.21]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.21
 [0.0.20]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.20
