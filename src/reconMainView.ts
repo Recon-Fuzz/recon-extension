@@ -57,9 +57,9 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                 case 'runFuzzer':
                     const defaultFuzzer = vscode.workspace.getConfiguration('recon').get<string>('defaultFuzzer', FuzzerTool.ECHIDNA);
                     if (defaultFuzzer === FuzzerTool.ECHIDNA) {
-                        vscode.commands.executeCommand('recon.runEchidna');
+                        vscode.commands.executeCommand('recon.runEchidna', message.value);
                     } else {
-                        vscode.commands.executeCommand('recon.runMedusa');
+                        vscode.commands.executeCommand('recon.runMedusa', message.value);
                     }
                     break;
             }
@@ -241,14 +241,17 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     document.addEventListener('click', (e) => {
                         const button = e.target.closest('vscode-button');
                         if (!button) return;
-                        
+                        const target = document.getElementById('target-contract')?.value || 'CryticTester';
                         // Check for specific button actions
                         if (button.id === 'generate-btn') {
                             vscode.postMessage({ type: 'generate' });
                         } else if (button.id === 'settings-btn') {
                             vscode.postMessage({ type: 'openSettings' });
                         } else if (button.id === 'fuzz-btn') {
-                            vscode.postMessage({ type: 'runFuzzer' });
+                            vscode.postMessage({
+                                type: 'runFuzzer',
+                                value: target
+                            });
                         } else if (button.hasAttribute('data-select-config')) {
                             vscode.postMessage({ type: 'selectFoundryConfig' });
                         }
@@ -432,7 +435,13 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         ></vscode-text-field>
                     </div>
                 </div>
-                
+                <div class="setting-group" style="margin-top:12px;">
+                    <label>Target:</label>
+                    <vscode-text-field
+                        id="target-contract"
+                        value="CryticTester"
+                    ></vscode-text-field>
+                </div>
                 <vscode-button id="fuzz-btn" appearance="primary">
                     <span class="generate-btn-content">
                         <i class="codicon codicon-beaker"></i>
