@@ -27,7 +27,7 @@ export async function findOutputDirectory(workspaceRoot: string): Promise<string
     }
 }
 
-export let srcDirectory: string | null = null;
+export let srcDirectory: string = 'src';
 
 export async function findSrcDirectory(workspaceRoot: string): Promise<void> {
     try {
@@ -36,12 +36,8 @@ export async function findSrcDirectory(workspaceRoot: string): Promise<void> {
         const match = configContent.match(/src\s*=\s*["'](.+?)["']/);
         if (match) {
             srcDirectory = match[1];
-            return;
         }
-        srcDirectory = 'src';
-    } catch {
-        srcDirectory = 'src';
-    }
+    } catch {}
 }
 
 
@@ -164,7 +160,7 @@ export async function cleanupEchidnaCoverageReport(workspaceRoot: string, conten
     // Filter blocks based on path conditions
     const filteredBlocks = fileBlocks.filter(block => {
         const relativePath = path.relative(foundryRoot, block.path);
-        if (relativePath.startsWith(srcDirectory || 'src')) {
+        if (relativePath.startsWith(`${srcDirectory}/`)) {
             return true;
         }
         if (relativePath.includes('/recon')) {
@@ -200,7 +196,7 @@ export async function cleanupMedusaCoverageReport(content: string): Promise<stri
         const sourceDivs = document.querySelectorAll('div.source-file');
         sourceDivs.forEach(div => {
             const filePath = div.getAttribute('data-file-path') || '';
-            const shouldRemove = !(filePath.startsWith(srcDirectory || 'src') || filePath.includes('/recon'));
+            const shouldRemove = !(filePath.startsWith(`${srcDirectory}/`) || filePath.includes('/recon'));
             if (shouldRemove) {
                 div.remove();
             }
@@ -225,7 +221,7 @@ export async function cleanupMedusaCoverageReport(content: string): Promise<stri
             const containerDiv = button.nextElementSibling as HTMLElement;
 
             // Check if we should keep this entry
-            const shouldKeep = relativePath.startsWith(srcDirectory || 'src') || relativePath.includes('/recon');
+            const shouldKeep = relativePath.startsWith(`${srcDirectory}/`) || relativePath.includes('/recon');
 
             if (!shouldKeep) {
                 // Remove both button and container
