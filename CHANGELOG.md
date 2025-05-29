@@ -5,6 +5,8 @@
 ### Fixed
 - Custom target contract
 - Custom src folder handling
+- Fallback/Receive functions mock
+- Payable functions mock
 
 ## [0.0.23] - 26.05.2025
 
