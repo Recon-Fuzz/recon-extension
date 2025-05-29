@@ -46,15 +46,15 @@ async function runFuzzer(
         const testLimit = config.get<number>('testLimit', 1000000);
         const mode = config.get<string>('mode', 'assertion');
 
-        command = `echidna . --contract ${target} --config echidna.yaml --format text --workers ${workers} --test-limit ${testLimit} --test-mode ${mode}`;
+        command = `echidna . --contract ${target || 'CryticTester'} --config echidna.yaml --format text --workers ${workers || 10} --test-limit ${testLimit} --test-mode ${mode}`;
     } else {
         const config = vscode.workspace.getConfiguration('recon.medusa');
         const workers = config.get<number>('workers', 10);
         const testLimit = config.get<number>('testLimit', 0);
 
-        command = `medusa fuzz --workers ${workers} --test-limit ${testLimit}`;
+        command = `medusa fuzz --workers ${workers || 10} --test-limit ${testLimit}`;
         if (target !== 'CryticTester') {
-            command += ` --target-contracts ${target}`;
+            command += ` --target-contracts ${target || 'CryticTester'}`;
         }
     }
 
