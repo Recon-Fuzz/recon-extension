@@ -17,18 +17,20 @@ export async function activate(context: vscode.ExtensionContext) {
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
     const workspaceService = new WorkspaceService();
+
     const authService = new AuthService(context);
-    
+
     // Create view providers
     const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
     const reconContractsProvider = new ReconContractsViewProvider(context.extensionUri, context);
     const coverageViewProvider = new CoverageViewProvider(context.extensionUri);
+
     const reconProProvider = new ReconProViewProvider(
         context.extensionUri,
         authService,
         context
     );
-    
+
     // Register WebView Providers
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('recon-main', reconMainProvider),
@@ -47,7 +49,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Create and setup contract watcher
     const contractWatcherService = new ContractWatcherService(reconContractsProvider, context);
-    await contractWatcherService.initializeWatcher();
+    // await contractWatcherService.initializeWatcher();
 
     // Register CodeLens provider
     const codeLensProvider = new SolFileProcessor(reconContractsProvider);
@@ -57,10 +59,10 @@ export async function activate(context: vscode.ExtensionContext) {
             codeLensProvider
         )
     );
-    
+
     // Register all commands
     await registerCommands(context, {
-        outputService, 
+        outputService,
         statusBarService,
         reconMainProvider,
         reconContractsProvider,
@@ -68,23 +70,8 @@ export async function activate(context: vscode.ExtensionContext) {
         contractWatcherService,
         workspaceService
     });
-
-    // Check if we need to build the project automatically
-    // if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) {
-    //     const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-    //     try {
-    //         const foundryConfigPath = getFoundryConfigPath(workspacePath);
-    //         await fs.access(foundryConfigPath);
-            
-    //         // foundry.toml exists, check output directory
-    //         const exists = await outputDirectoryExist(workspacePath);
-    //         if (!exists) {
-    //             vscode.commands.executeCommand('recon.buildProject');
-    //         }
-    //     } catch {
-    //         // foundry.toml doesn't exist, do nothing
-    //     }
-    // }
+    vscode.commands.executeCommand('recon.refreshContracts');
+    vscode.commands.executeCommand('recon.refreshCoverage');
 }
 
 export function deactivate() {}

@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { exec } from 'child_process';
 import { processLogs, generateJobMD, Fuzzer } from '@recon-fuzz/log-parser';
-import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid } from '../utils';
+import { getFoundryConfigPath, getTestFolder, prepareTrace, stripAnsiCodes, getUid, getEnvironmentPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 
 export function registerFuzzingCommands(
@@ -12,22 +11,23 @@ export function registerFuzzingCommands(
 ): void {
     // Register Echidna command
     context.subscriptions.push(
-        vscode.commands.registerCommand('recon.runEchidna', async () => {
-            await runFuzzer(Fuzzer.ECHIDNA, services);
+        vscode.commands.registerCommand('recon.runEchidna', async (target?: string) => {
+            await runFuzzer(Fuzzer.ECHIDNA, services, target);
         })
     );
 
     // Register Medusa command
     context.subscriptions.push(
-        vscode.commands.registerCommand('recon.runMedusa', async () => {
-            await runFuzzer(Fuzzer.MEDUSA, services);
+        vscode.commands.registerCommand('recon.runMedusa', async (target?: string) => {
+            await runFuzzer(Fuzzer.MEDUSA, services, target);
         })
     );
 }
 
 async function runFuzzer(
-    fuzzerType: Fuzzer, 
-    services: ServiceContainer
+    fuzzerType: Fuzzer,
+    services: ServiceContainer,
+    target: string = 'CryticTester'
 ): Promise<void> {
     if (!vscode.workspace.workspaceFolders) {
         vscode.window.showErrorMessage('Please open a workspace first');
@@ -39,20 +39,23 @@ async function runFuzzer(
     const foundryRoot = path.dirname(foundryConfigPath);
 
     let command: string;
-    
+
     if (fuzzerType === Fuzzer.ECHIDNA) {
         const config = vscode.workspace.getConfiguration('recon.echidna');
         const workers = config.get<number>('workers', 8);
         const testLimit = config.get<number>('testLimit', 1000000);
         const mode = config.get<string>('mode', 'assertion');
 
-        command = `echidna . --contract CryticTester --config echidna.yaml --format text --workers ${workers} --test-limit ${testLimit} --test-mode ${mode}`;
+        command = `echidna . --contract ${target || 'CryticTester'} --config echidna.yaml --format text --workers ${workers || 10} --test-limit ${testLimit} --test-mode ${mode}`;
     } else {
         const config = vscode.workspace.getConfiguration('recon.medusa');
         const workers = config.get<number>('workers', 10);
         const testLimit = config.get<number>('testLimit', 0);
 
-        command = `medusa fuzz --workers ${workers} --test-limit ${testLimit}`;
+        command = `medusa fuzz --workers ${workers || 10} --test-limit ${testLimit}`;
+        if (target !== 'CryticTester') {
+            command += ` --target-contracts ${target || 'CryticTester'}`;
+        }
     }
 
     // Create output channel for live feedback
@@ -75,7 +78,12 @@ async function runFuzzer(
             childProcess = require('child_process').spawn(command, {
                 cwd: foundryRoot,
                 shell: true,
-                detached: true
+                detached: true,
+                ...(process.platform !== 'win32' && { stdio: 'pipe' }),
+                env: {
+                    ...process.env,
+                    PATH: getEnvironmentPath()
+                }
             });
 
             // Handle graceful shutdown
@@ -92,19 +100,43 @@ async function runFuzzer(
                             );
                         } else {
                             if (reason === 'stopped by user') {
-                                process.kill(-childProcess.pid, 'SIGINT');
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                if (!processCompleted) {
-                                    process.kill(-childProcess.pid, 'SIGKILL');
+                                if (fuzzerType === Fuzzer.MEDUSA) {
+                                    process.kill(-childProcess.pid, 'SIGINT');
+                                } else {
+                                    process.kill(-childProcess.pid, 'SIGTERM');
                                 }
                             }
                         }
 
                         outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
 
+                        // Wait for "Saving test reproducers" for Echidna
+                        if (fuzzerType === Fuzzer.ECHIDNA) {
+                            // Wait for "Saving test reproducers" with 1 minute timeout
+                            let waited = 0;
+                            while (waited < 60000 && !output.includes("Saving test reproducers")) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                waited += 1000;
+                            }
+                        } else if (fuzzerType === Fuzzer.MEDUSA) {
+                            // Wait for "Test summary:" with 1 minute timeout
+                            let waited = 0;
+                            while (waited < 60000 && !output.includes("Test summary:")) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                waited += 1000;
+                            }
+                        }
+
                         // Generate report if we have enough data
                         if (hasEnoughData) {
                             try {
+                                if (fuzzerType === Fuzzer.ECHIDNA) {
+                                    let splitOutput = output.split('Stopping.');
+                                    if (splitOutput.length > 1) {
+                                        splitOutput = splitOutput.slice(1);
+                                        output = splitOutput.join('Stopping.');
+                                    }
+                                }
                                 const results = processLogs(output, fuzzerType);
                                 const reportContent = generateJobMD(
                                     fuzzerType,
@@ -142,7 +174,7 @@ async function runFuzzer(
                                         try {
                                             const testFolder = await getTestFolder(workspaceRoot);
                                             const foundryTestPath = path.join(foundryRoot, testFolder, 'recon', 'CryticToFoundry.sol');
-                                            
+
                                             try {
                                                 const existingContent = await fs.readFile(foundryTestPath, 'utf8');
                                                 const newContent = existingContent.replace(/}([^}]*)$/, `\n    ${repros}\n}$1`);
@@ -220,7 +252,7 @@ async function runFuzzer(
                         const corpusMatch = text.match(/corpus: (\d+)/);
                         const failuresMatch = text.match(/failures: (\d+)\/(\d+)/);
                         const callsMatch = text.match(/calls: (\d+)/);
-                        
+
                         if (corpusMatch && failuresMatch && callsMatch) {
                             const corpus = corpusMatch[1];
                             const [, failures, totalTests] = failuresMatch;

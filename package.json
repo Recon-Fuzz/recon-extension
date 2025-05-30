@@ -2,8 +2,8 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
-  "version": "0.1.1",
-  "license": "MIT",
+  "version": "0.0.24",
+  "license": "gpl-2.0",
   "publisher": "Recon-Fuzz",
   "repository": {
     "type": "git",
@@ -76,6 +76,11 @@
           "group": "navigation"
         },
         {
+          "command": "recon.refreshContracts",
+          "when": "view == recon-contracts",
+          "group": "navigation"
+        },
+        {
           "command": "recon.hideAllFiles",
           "when": "view == recon-contracts && recon.showingAllFiles",
           "group": "navigation"
@@ -133,6 +138,11 @@
         "command": "recon.showAllFiles",
         "title": "Show All Files",
         "icon": "$(eye)"
+      },
+      {
+        "command": "recon.refreshContracts",
+        "title": "Refresh Contracts",
+        "icon": "$(refresh)"
       },
       {
         "command": "recon.hideAllFiles",
@@ -344,15 +354,15 @@
   },
   "dependencies": {
     "@recon-fuzz/log-parser": "^0.0.28",
-    "@solidity-parser/parser": "^0.19.0",
+    "@solidity-parser/parser": "^0.20.1",
     "@vscode/codicons": "^0.0.36",
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "abi-to-mock": "^1.0.7",
+    "abi-to-mock": "^1.0.11",
     "case": "^1.6.3",
     "echidna-coverage-parser": "^1.0.1",
     "extract-zip": "^2.0.1",
     "handlebars": "^4.7.8",
-    "jsdom": "^26.0.0",
-    "yaml": "^2.7.0"
+    "jsdom": "^26.1.0",
+    "yaml": "^2.7.1"
   }
 }

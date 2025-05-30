@@ -174,7 +174,7 @@ function getDefaultValue(type: string) {
         return 'bytes("")';
     } else if(type.startsWith("bytes")){
         return `${type}("")`;
-    } 
+    }
     return '"__HandleMe__"';
 }
 

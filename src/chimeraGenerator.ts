@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { TemplateManager } from './generators/manager';
-import { findOutputDirectory, getFoundryConfigPath } from './utils';
+import { findOutputDirectory, getEnvironmentPath, getFoundryConfigPath } from './utils';
 import { ContractMetadata } from './types';
 
 export class ChimeraGenerator {
@@ -113,7 +113,13 @@ export class ChimeraGenerator {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
                 exec('forge install Recon-Fuzz/chimera --no-git',
-                    { cwd: foundryRoot },
+                    { 
+                        cwd: foundryRoot,
+                        env: {
+                            ...process.env,
+                            PATH: getEnvironmentPath()
+                        }
+                    },
                     (error, stdout, stderr) => {
                         if (error) {reject(error);}
                         else {resolve(stdout);}
@@ -130,7 +136,13 @@ export class ChimeraGenerator {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
                 exec('forge install Recon-Fuzz/setup-helpers --no-git',
-                    { cwd: foundryRoot },
+                    { 
+                        cwd: foundryRoot,
+                        env: {
+                            ...process.env,
+                            PATH: getEnvironmentPath()
+                        }
+                    },
                     (error, stdout, stderr) => {
                         if (error) {reject(error);}
                         else {resolve(stdout);}
@@ -175,7 +187,13 @@ export class ChimeraGenerator {
         } catch {
             await new Promise((resolve, reject) => {
                 exec('forge remappings > remappings.txt',
-                    { cwd: foundryRoot },
+                    { 
+                        cwd: foundryRoot,
+                        env: {
+                            ...process.env,
+                            PATH: getEnvironmentPath()
+                        }
+                    },
                     (error, stdout, stderr) => {
                         if (error) {reject(error);}
                         else {resolve(stdout);}

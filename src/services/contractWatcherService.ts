@@ -1,43 +1,16 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { ChimeraGenerator } from '../chimeraGenerator';
 import { findOutputDirectory } from '../utils';
 import { ReconContractsViewProvider } from '../reconContractsView';
 
 export class ContractWatcherService {
-    private watcher: vscode.FileSystemWatcher | undefined;
+    // private watcher: vscode.FileSystemWatcher | undefined;
+    // private folderWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor(
         private contractsProvider: ReconContractsViewProvider,
         private context: vscode.ExtensionContext
     ) { }
-
-    public async initializeWatcher(): Promise<void> {
-        if (!vscode.workspace.workspaceFolders) { return; }
-
-        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-        const outPath = await findOutputDirectory(workspaceRoot);
-        const relativePath = path.relative(workspaceRoot, outPath);
-
-        // Create watcher for just the output directory in workspace root
-        this.watcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(workspaceRoot, relativePath),
-            false, false, false
-        );
-
-        this.context.subscriptions.push(this.watcher);
-
-        // Watch for directory existence changes only
-        this.watcher.onDidCreate(() => {
-            this.checkAndLoadContracts();
-        });
-        this.watcher.onDidDelete(() => {
-            this.contractsProvider.setContracts([]);
-        });
-
-        // Check contracts on initialization
-        await this.checkAndLoadContracts();
-    }
 
     public async checkAndLoadContracts(): Promise<void> {
         if (!vscode.workspace.workspaceFolders) { return; }

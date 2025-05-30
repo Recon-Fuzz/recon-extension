@@ -1,7 +1,7 @@
 # Recon - Smart Contract Fuzzing Extension
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c79df2a8-9577-48ab-82e8-4882a0fe7e06" alt="Recon Logo" width="128" height="128">
+  <img src="https://avatars.githubusercontent.com/u/152159338?s=200&v=4" alt="Recon Logo" width="128" height="128">
 </p>
 
 <p align="center">
@@ -22,14 +22,14 @@
 
 ## Features
 
-Recon is a VS Code extension that streamlines smart contract testing by providing:
+The Recon extension is a VS Code extension that streamlines smart contract testing by providing:
 
-- **One-click setup**: Automatically install and configure Chimera templates
-- **Integrated fuzzing**: Run Echidna and Medusa directly from VS Code
+- **One-click setup**: Automatically install and configure [Chimera](https://github.com/Recon-Fuzz/chimera) templates
+- **Integrated fuzzing**: Run [Echidna](https://github.com/crytic/echidna) and [Medusa](https://github.com/crytic/medusa) directly from VS Code
 - **Contract explorer**: Browse and select target contracts and functions
-- **Status bar integration**: Quick access to fuzzing tools
+- **Fuzzer integration**: Quick access to fuzzing tools directly through the extension
 - **Coverage visualization**: View and analyze code coverage from fuzzers
-- **Test reproduction**: Generate Foundry test cases from fuzzing findings
+- **Test generation**: Generate Foundry unit tests from call sequences that break properties found by the fuzzer
 - **Mock/TargetFunctions generation**: Easily create mock contracts and target functions for testing
 - **CodeLens integration**: Run tests and modify function behaviors directly in the editor
 
@@ -43,6 +43,8 @@ Recon is a VS Code extension that streamlines smart contract testing by providin
 - Medusa (optional)
 
 ### Install from VS Code Marketplace
+
+Official Link: https://marketplace.visualstudio.com/items?itemName=Recon-Fuzz.recon
 
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
@@ -60,7 +62,7 @@ Recon is a VS Code extension that streamlines smart contract testing by providin
 
 1. Open a Foundry project in VS Code
 2. Click on the Recon icon in the activity bar
-3. In the Cockpit view, click "Scaffold" to set up Recon templates
+3. In the Cockpit view, click "Scaffold" to set up a project using the [create-chimera-app](https://github.com/Recon-Fuzz/create-chimera-app/tree/main) template
 4. Select target contracts and functions in the Contracts view
 5. Run Echidna or Medusa from the status bar or Cockpit view
 
@@ -70,17 +72,17 @@ Recon is a VS Code extension that streamlines smart contract testing by providin
 
 The "Scaffold" button in the Recon Cockpit view will:
 
-- Install Chimera as a library dependency
-- Update remappings.txt with the necessary mappings
+- Install Chimera as a Foundry submodule dependency
+- Update `remappings.txt` with the necessary dependency remappings
 - Create template files in the test/recon directory
 - Configure your project for fuzzing
 
 ### Selecting Target Contracts and Functions
 
-In the Contracts view:
+In the Contracts view you can:
 
 1. Enable the contracts you want to test
-2. For each contract, select the functions to include in testing
+2. For each contract, select the functions to include in the generated [`TargetFunctions`](https://book.getrecon.xyz/tutorial/chimera_framework.html#targetfunctions) contract
 3. Configure function properties:
    - Actor: Regular user or admin
    - Mode: Normal execution, expected failure, or catch exceptions
@@ -102,7 +104,7 @@ After running a fuzzer with coverage enabled:
 
 ### Generating Mocks
 
-Right-click on a contract's JSON artifact or Solidity file and select "Generate Solidity Mock" to create a mock implementation of the contract.
+Right-click on a contract's JSON artifact (located in the `out/` directory by default) or Solidity file and select "Generate Solidity Mock" to create a mock implementation of the contract.
 
 ## Configuration
 
@@ -116,7 +118,7 @@ Recon can be configured through VS Code settings:
 
 ### Echidna Settings
 
-- `recon.echidna.mode`: Select fuzzing strategy (assertion, property, etc.)
+- `recon.echidna.mode`: Configure [testing mode](https://secure-contracts.com/program-analysis/echidna/configuration.html#testmode) (assertion, property, etc.)
 - `recon.echidna.testLimit`: Maximum number of test cases to run
 - `recon.echidna.workers`: Number of parallel workers
 
@@ -136,7 +138,7 @@ Recon can be configured through VS Code settings:
 
 - **Fuzzer not found**: Ensure Echidna/Medusa are installed and in your PATH
 - **Compilation errors**: Run `forge build` manually to identify issues
-- **No contracts showing**: Check if out/ directory exists with compiled contracts
+- **No contracts showing**: Check if `out/` directory exists with compiled contracts
 
 ## License
 

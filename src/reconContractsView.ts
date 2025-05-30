@@ -102,16 +102,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private debouncedSaveState() {
-        if (this.saveStateTimeout) {
-            clearTimeout(this.saveStateTimeout);
-        }
-
-        this.saveStateTimeout = setTimeout(async () => {
-            await this.saveState();
-        }, 500); // 500ms debounce
-    }
-
     public async loadState() {
         try {
             const reconJson = await this.loadReconJson();
@@ -173,6 +163,12 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this._extensionUri]
         };
 
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                vscode.commands.executeCommand('recon.refreshContracts');
+            }
+        });
+
         webviewView.webview.onDidReceiveMessage(async message => {
             try {
                 switch (message.type) {
@@ -226,7 +222,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 );
                             }
                             this.saveState();
-                            
+
                             // Return updated contract data without rerendering everything
                             if (message.clientUpdate) {
                                 // We let client handle the UI update
@@ -240,12 +236,12 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         } else {
                             this.collapsedContracts.add(message.contractName);
                         }
-                        
+
                         // Only update the collapsed state without full rerender
                         if (this._view) {
                             this._view.webview.postMessage({
-                                type: 'updatedCollapsedState', 
-                                contractName: message.contractName, 
+                                type: 'updatedCollapsedState',
+                                contractName: message.contractName,
                                 collapsed: this.collapsedContracts.has(message.contractName)
                             });
                             return;
@@ -274,7 +270,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             }
                             // Only save state, don't update webview
                             this.saveState();
-                            
+
                             // Only notify the client that the update was successful
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
@@ -302,7 +298,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         if (contract4) {
                             contract4.separated = message.separated;
                             await this.saveState();
-                            
+
                             // Only notify the client that the update was successful
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
@@ -345,7 +341,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 contract5.functionConfigs = [...message.functionConfigs];
                             }
                             await this.saveState();
-                            
+
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
                                     type: 'batchUpdateSuccess',
@@ -356,8 +352,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                         break;
                 }
-                // Use debounced save for all state changes
-                this.debouncedSaveState();
             } catch (e) {
                 console.error('Error handling webview message:', e);
             }
@@ -380,7 +374,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             contract.enabledFunctions = [];
         }
         await this.saveState();
-        
+
         // Send targeted update to webview instead of full refresh
         if (this._view) {
             this._view.webview.postMessage({
@@ -392,7 +386,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             });
             return;
         }
-        
+
         // Fall back to full refresh if targeted update fails
         this._updateWebview();
     }
@@ -1300,15 +1294,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return this.getMutableFunctions(contract.abi).length > 0;
     }
 
-    private areAllContractsSelected(): boolean {
-        const visibleContracts = this.contracts.filter(
-            contract =>
-                this.hasMutableFunctions(contract) &&
-                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('lib/') && !contract.path.startsWith('script/')))
-        );
-        return visibleContracts.length > 0 && visibleContracts.every(c => c.enabled);
-    }
-
     private getContractsHtml(): string {
         if (this.contracts.length === 0) {
             return `
@@ -1325,7 +1310,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         const visibleContracts = this.contracts
             .filter(contract =>
                 this.hasMutableFunctions(contract) &&
-                (this.showAllFiles || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
+                (this.showAllFiles || (contract.name.includes("Mock") && (contract.path.startsWith('test/') || contract.path.startsWith('src/test/'))) || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
             )
             .sort((a, b) => {
                 const aDepth = a.path.split('/').length;
@@ -1420,16 +1405,16 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return `
             <div class="functions-list">
                 ${functions.map(fn => {
-                    const signature = this.getFunctionSignature(fn);
-                    // Find existing config or use default only if no config exists
-                    const config = contract.functionConfigs?.find(f => f.signature === signature) ?? {
-                        signature,
-                        actor: Actor.ACTOR,
-                        mode: Mode.NORMAL
-                    };
-                    const isEnabled = contract.enabledFunctions?.includes(signature);
+            const signature = this.getFunctionSignature(fn);
+            // Find existing config or use default only if no config exists
+            const config = contract.functionConfigs?.find(f => f.signature === signature) ?? {
+                signature,
+                actor: Actor.ACTOR,
+                mode: Mode.NORMAL
+            };
+            const isEnabled = contract.enabledFunctions?.includes(signature);
 
-                    return `
+            return `
                         <div class="function-item">
                             <div class="function-header">
                                 <vscode-checkbox
@@ -1488,7 +1473,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             ` : ''}
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
     }
