@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getFoundryConfigPath } from './utils';
+import { findSrcDirectory, getFoundryConfigPath } from './utils';
 import { CoverageFile, FuzzerTool } from './types';
 import { readCoverageFileAndProcess } from 'echidna-coverage-parser';
 
@@ -15,6 +15,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             throw new Error('No workspace folder found');
         }
         this._workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        findSrcDirectory(this._workspaceRoot);
         this.startWatchingCoverageFiles();
     }
 

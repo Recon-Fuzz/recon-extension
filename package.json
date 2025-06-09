@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "license": "gpl-2.0",
   "publisher": "Recon-Fuzz",
   "repository": {
@@ -339,7 +339,7 @@
     "@solidity-parser/parser": "^0.20.1",
     "@vscode/codicons": "^0.0.36",
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "abi-to-mock": "^1.0.10",
+    "abi-to-mock": "^1.0.11",
     "case": "^1.6.3",
     "echidna-coverage-parser": "^1.0.1",
     "handlebars": "^4.7.8",

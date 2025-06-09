@@ -11,22 +11,23 @@ export function registerFuzzingCommands(
 ): void {
     // Register Echidna command
     context.subscriptions.push(
-        vscode.commands.registerCommand('recon.runEchidna', async () => {
-            await runFuzzer(Fuzzer.ECHIDNA, services);
+        vscode.commands.registerCommand('recon.runEchidna', async (target?: string) => {
+            await runFuzzer(Fuzzer.ECHIDNA, services, target);
         })
     );
 
     // Register Medusa command
     context.subscriptions.push(
-        vscode.commands.registerCommand('recon.runMedusa', async () => {
-            await runFuzzer(Fuzzer.MEDUSA, services);
+        vscode.commands.registerCommand('recon.runMedusa', async (target?: string) => {
+            await runFuzzer(Fuzzer.MEDUSA, services, target);
         })
     );
 }
 
 async function runFuzzer(
     fuzzerType: Fuzzer,
-    services: ServiceContainer
+    services: ServiceContainer,
+    target: string = 'CryticTester'
 ): Promise<void> {
     if (!vscode.workspace.workspaceFolders) {
         vscode.window.showErrorMessage('Please open a workspace first');
@@ -45,13 +46,16 @@ async function runFuzzer(
         const testLimit = config.get<number>('testLimit', 1000000);
         const mode = config.get<string>('mode', 'assertion');
 
-        command = `echidna . --contract CryticTester --config echidna.yaml --format text --workers ${workers} --test-limit ${testLimit} --test-mode ${mode}`;
+        command = `echidna . --contract ${target || 'CryticTester'} --config echidna.yaml --format text --workers ${workers || 10} --test-limit ${testLimit} --test-mode ${mode}`;
     } else {
         const config = vscode.workspace.getConfiguration('recon.medusa');
         const workers = config.get<number>('workers', 10);
         const testLimit = config.get<number>('testLimit', 0);
 
-        command = `medusa fuzz --workers ${workers} --test-limit ${testLimit}`;
+        command = `medusa fuzz --workers ${workers || 10} --test-limit ${testLimit}`;
+        if (target !== 'CryticTester') {
+            command += ` --target-contracts ${target || 'CryticTester'}`;
+        }
     }
 
     // Create output channel for live feedback
