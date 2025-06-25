@@ -26,9 +26,6 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.onDidReceiveMessage(async message => {
             switch (message.type) {
-                case 'generate':
-                    vscode.commands.executeCommand('recon.installChimera');
-                    break;
                 case 'selectFoundryConfig':
                     this.selectFoundryConfig();
                     break;
