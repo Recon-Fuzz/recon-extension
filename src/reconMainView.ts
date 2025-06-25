@@ -161,9 +161,6 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         --control-height: 12px;
                         --control-width: 12px;
                     }
-                    #generate-btn {
-                        width: 100%;
-                    }
                     .no-contracts {
                         color: var(--vscode-descriptionForeground);
                         font-style: italic;
@@ -203,9 +200,6 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         gap: 8px;
                         margin-bottom: 16px;
                     }
-                    #generate-btn {
-                        flex: 1;
-                    }
                     #settings-btn::part(control) {
                         background: var(--vscode-button-secondaryBackground);
                         color: var(--vscode-button-secondaryForeground);
@@ -227,8 +221,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         margin-bottom: 16px;
                     }
                     #fuzz-btn {
-                        width: 100%;
-                        margin-top: 16px;
+                        flex: 1;
                     }
                 </style>
             </head>
@@ -243,9 +236,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         if (!button) return;
                         const target = document.getElementById('target-contract')?.value || 'CryticTester';
                         // Check for specific button actions
-                        if (button.id === 'generate-btn') {
-                            vscode.postMessage({ type: 'generate' });
-                        } else if (button.id === 'settings-btn') {
+                        if (button.id === 'settings-btn') {
                             vscode.postMessage({ type: 'openSettings' });
                         } else if (button.id === 'fuzz-btn') {
                             vscode.postMessage({
@@ -363,10 +354,10 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
         return `
             <div class="button-container">
                 <div class="header">
-                    <vscode-button id="generate-btn" appearance="primary">
+                    <vscode-button id="fuzz-btn" appearance="primary">
                         <span class="generate-btn-content">
-                            <i class="codicon codicon-wand"></i>
-                            Scaffold
+                            <i class="codicon codicon-beaker"></i>
+                            Fuzz with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : 'Medusa'}
                         </span>
                     </vscode-button>
                     <vscode-button id="settings-btn" appearance="secondary">
@@ -377,7 +368,6 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                 </div>
                 
                 <div class="fuzzer-selection">
-                    <div class="fuzzer-selection-label">Fuzzer:</div>
                     <vscode-radio-group id="fuzzer-selection" value="${defaultFuzzer}">
                         <vscode-radio value="${FuzzerTool.ECHIDNA}">Echidna</vscode-radio>
                         <vscode-radio value="${FuzzerTool.MEDUSA}">Medusa</vscode-radio>
@@ -442,12 +432,6 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         value="CryticTester"
                     ></vscode-text-field>
                 </div>
-                <vscode-button id="fuzz-btn" appearance="primary">
-                    <span class="generate-btn-content">
-                        <i class="codicon codicon-beaker"></i>
-                        Fuzz with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : 'Medusa'}
-                    </span>
-                </vscode-button>
             </div>
         `;
     }

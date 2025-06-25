@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.25] - 25.06.2025
+
+### Added
+- Log to Foundry Repro Converter
+
+### Fixed
+- Rearrange the buttons for better UX
+- Upgrade dependencies
+
 ## [0.0.24] - 29.05.2025
 
 ### Fixed
@@ -45,6 +54,7 @@
 - Coverage report compatibility with new Medusa report format
 - Issue with fuzzer not stopping
 
+[0.0.25]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.25
 [0.0.24]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.24
 [0.0.23]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.23
 [0.0.22]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.22
