@@ -175,6 +175,9 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     case 'build':
                         vscode.commands.executeCommand('recon.buildProject');
                         break;
+                    case 'generate':
+                        vscode.commands.executeCommand('recon.installChimera');
+                        break;
                     case 'toggleShowAll':
                         this.showAllFiles = message.value;
                         this._updateWebview();
@@ -414,6 +417,18 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         font-family: var(--vscode-font-family);
                         font-size: var(--vscode-font-size);
                     }
+
+                    vscode-button::part(control) {
+                        background: #5c25d2;
+                        color: white;
+                        border: none;
+                        padding: 8px 12px;
+                    }
+                    
+                    vscode-button:hover::part(control) {
+                        background: #4a1ea8;
+                    }
+
                     .search-container {
                         position: sticky;
                         top: 0;
@@ -541,6 +556,11 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         margin-top: 2px;
                         font-family: var (--vscode-editor-font-family);
                         cursor: pointer;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        max-width: 100%;
+                        display: block;
                     }
                     .contract-path:hover {
                         opacity: 1;
@@ -610,6 +630,30 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     }
                     .batch-actions vscode-button {
                         flex: 1;
+                    }
+                    /* Add scaffold button styles */
+                    .scaffold-button-container {
+                        position: sticky;
+                        bottom: 0;
+                        background: var(--vscode-sideBar-background);
+                        border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+                        padding: 8px;
+                        z-index: 10;
+                        display: flex;
+                        gap: 8px;
+                    }
+                    .scaffold-button-container vscode-button {
+                        flex: 1;
+                    }
+                    .scaffold-button-container vscode-button::part(control) {
+                        width: 100%;
+                    }
+                    .generate-btn-content {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 8px;
+                        width: 100%;
                     }
                     /* Add virtual list support */
                     .virtual-list-container {
@@ -705,6 +749,16 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     No contracts found matching "<span id="search-term"></span>"
                 </div>
                 <div id="saving-indicator" class="saving-indicator">Saving...</div>
+                ${this.contracts.length > 0 ? `
+                    <div class="scaffold-button-container">
+                        <vscode-button id="generate-btn" appearance="primary">
+                            <span class="generate-btn-content">
+                                <i class="codicon codicon-wand"></i>
+                                Scaffold
+                            </span>
+                        </vscode-button>
+                    </div>
+                ` : ''}
                 <script>
                     const vscode = acquireVsCodeApi();
                     
@@ -1094,17 +1148,18 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         const contractItems = document.querySelectorAll('.contract-item');
                         const noResults = document.getElementById('no-results');
                         const searchTerm = document.getElementById('search-term');
+                        const contractGroups = document.querySelectorAll('.contract-group');
                         
                         searchTerm.textContent = query;
                         
                         let visibleCount = 0;
-                        const matchedItems = [];
                         
                         // First pass: reset all items if the query is empty
                         if (!query || query.trim() === '') {
+                            contractGroups.forEach(group => {
+                                group.classList.remove('hidden');
+                            });
                             contractItems.forEach(item => {
-                                item.classList.remove('hidden');
-                                
                                 // Reset to original text (no highlights)
                                 const nameElement = item.querySelector('.contract-name');
                                 const pathElement = item.querySelector('.contract-path');
@@ -1116,8 +1171,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 if (pathElement) {
                                     pathElement.textContent = item.getAttribute('data-path');
                                 }
-                                
-                                visibleCount++;
                             });
                             
                             // Hide the no results message
@@ -1125,10 +1178,10 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             return;
                         }
                         
-                        // First pass: do the fuzzy matching and collect results
-                        contractItems.forEach(item => {
-                            const contractGroup = item.closest('.contract-group');
-                            if (contractGroup) {
+                        // Search implementation for non-empty query
+                        contractGroups.forEach(group => {
+                            const item = group.querySelector('.contract-item');
+                            if (item) {
                                 const contractName = item.getAttribute('data-name');
                                 const contractPath = item.getAttribute('data-path');
                                 
@@ -1136,38 +1189,20 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 const pathMatch = fuzzyMatch(contractPath, query);
                                 
                                 if (nameMatch.match || pathMatch.match) {
-                                    contractGroup.classList.remove('hidden');
-                                    matchedItems.push({
-                                        element: item,
-                                        score: Math.min(nameMatch.score, pathMatch.score),
-                                        nameHighlighted: nameMatch.highlighted,
-                                        pathHighlighted: pathMatch.highlighted
-                                    });
+                                    group.classList.remove('hidden');
+                                    const nameElement = item.querySelector('.contract-name');
+                                    const pathElement = item.querySelector('.contract-path');
+                                    
+                                    if (nameElement) {
+                                        nameElement.innerHTML = nameMatch.highlighted;
+                                    }
+                                    if (pathElement) {
+                                        pathElement.innerHTML = pathMatch.highlighted;
+                                    }
                                     visibleCount++;
                                 } else {
-                                    contractGroup.classList.add('hidden');
+                                    group.classList.add('hidden');
                                 }
-                            }
-                        });
-                        
-                        // Sort matched items by score if we have a query
-                        if (query) {
-                            matchedItems.sort((a, b) => a.score - b.score);
-                        }
-                        
-                        // Apply results
-                        matchedItems.forEach(item => {
-                            item.element.classList.remove('hidden');
-                            
-                            // Update highlighted elements
-                            const nameElement = item.element.querySelector('.contract-name');
-                            const pathElement = item.element.querySelector('.contract-path');
-                            
-                            if (nameElement) {
-                                nameElement.innerHTML = item.nameHighlighted;
-                            }
-                            if (pathElement) {
-                                pathElement.innerHTML = item.pathHighlighted;
                             }
                         });
                         
@@ -1285,6 +1320,11 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         // Make sure all contracts are visible with no highlights when there's no search
                         filterContracts('');
                     }
+
+                    // Add scaffold button handler
+                    document.getElementById('generate-btn')?.addEventListener('click', () => {
+                        vscode.postMessage({ type: 'generate' });
+                    });
                 </script>
             </body>
             </html>`;

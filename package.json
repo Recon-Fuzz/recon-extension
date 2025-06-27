@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "license": "gpl-2.0",
   "publisher": "Recon-Fuzz",
   "repository": {
@@ -49,6 +49,13 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "recon.tools",
+        "label": "Tools",
+        "icon": "$(tools)"
+      }
+    ],
     "menus": {
       "view/item/context": [
         {
@@ -77,6 +84,11 @@
           "command": "recon.refreshCoverage",
           "when": "view == recon-coverage",
           "group": "navigation"
+        },
+        {
+          "submenu": "recon.tools",
+          "when": "view == recon-main",
+          "group": "navigation"
         }
       ],
       "explorer/context": [
@@ -94,6 +106,18 @@
           "command": "recon.cleanupCoverageReport",
           "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/)",
           "group": "2_workspace"
+        }
+      ],
+      "recon-cockpit": [
+        {
+          "submenu": "recon.tools",
+          "group": "navigation"
+        }
+      ],
+      "recon.tools": [
+        {
+          "command": "recon.logToFoundry",
+          "group": "1_conversion"
         }
       ]
     },
@@ -128,14 +152,14 @@
         "icon": "$(eye)"
       },
       {
-        "command": "recon.refreshContracts",
-        "title": "Refresh Contracts",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "recon.hideAllFiles",
         "title": "Hide Test & Library Files",
         "icon": "$(eye-closed)"
+      },
+      {
+        "command": "recon.refreshContracts",
+        "title": "Refresh Contracts",
+        "icon": "$(refresh)"
       },
       {
         "command": "recon.buildProject",
@@ -190,6 +214,11 @@
       {
         "command": "recon.generateTargetFunctions",
         "title": "Generate Target Functions",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.logToFoundry",
+        "title": "Log to Foundry",
         "category": "Recon"
       }
     ],
@@ -325,18 +354,19 @@
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
     "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
+    "@types/node": "24.0.4",
     "@types/vscode": "^1.88.0",
-    "@typescript-eslint/eslint-plugin": "^8.22.0",
-    "@typescript-eslint/parser": "^8.22.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.19.0",
-    "typescript": "^5.7.3"
+    "@typescript-eslint/eslint-plugin": "^8.35.0",
+    "@typescript-eslint/parser": "^8.35.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.29.0",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@recon-fuzz/log-parser": "^0.0.28",
+    "@recon-fuzz/log-parser": "^0.0.31",
     "@solidity-parser/parser": "^0.20.1",
+    "@types/prismjs": "^1.26.5",
     "@vscode/codicons": "^0.0.36",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "abi-to-mock": "^1.0.11",
@@ -344,6 +374,7 @@
     "echidna-coverage-parser": "^1.0.1",
     "handlebars": "^4.7.8",
     "jsdom": "^26.1.0",
-    "yaml": "^2.7.1"
+    "prismjs": "^1.30.0",
+    "yaml": "^2.8.0"
   }
 }

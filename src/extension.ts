@@ -8,6 +8,7 @@ import { SolFileProcessor } from './solFileProcessor';
 import { OutputService } from './services/outputService';
 import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
+import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 
 export async function activate(context: vscode.ExtensionContext) {   
     // Create services
@@ -53,6 +54,14 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     vscode.commands.executeCommand('recon.refreshContracts');
     vscode.commands.executeCommand('recon.refreshCoverage');
+
+    // Register Log to Foundry command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.logToFoundry', () => {
+            const provider = new LogToFoundryViewProvider(context.extensionUri);
+            provider.createWebviewPanel();
+        })
+    );
 }
 
 export function deactivate() {}

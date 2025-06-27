@@ -30,6 +30,7 @@ The Recon extension is a VS Code extension that streamlines smart contract testi
 - **Fuzzer integration**: Quick access to fuzzing tools directly through the extension
 - **Coverage visualization**: View and analyze code coverage from fuzzers
 - **Test generation**: Generate Foundry unit tests from call sequences that break properties found by the fuzzer
+- **Log to Foundry Repro converter**: Convert Echidna and Medusa logs to Foundry test reproductions with customizable VM options
 - **Mock/TargetFunctions generation**: Easily create mock contracts and target functions for testing
 - **CodeLens integration**: Run tests and modify function behaviors directly in the editor
 
@@ -105,6 +106,20 @@ After running a fuzzer with coverage enabled:
 ### Generating Mocks
 
 Right-click on a contract's JSON artifact (located in the `out/` directory by default) or Solidity file and select "Generate Solidity Mock" to create a mock implementation of the contract.
+
+### Converting Logs to Foundry Tests
+
+The Log to Foundry converter helps you create reproducible Foundry tests from fuzzer outputs:
+
+1. In the Recon Cockpit view, click "Tools" and select "Log to Foundry"
+2. Select your fuzzer (Echidna or Medusa)
+3. Paste the fuzzer log output into the text area
+4. Click "Convert" to process the log
+5. For each broken property found:
+   - Toggle VM options (vm.prank, vm.roll, vm.warp) independently
+   - View the generated Foundry test code with syntax highlighting
+   - Copy individual properties or all properties at once
+   - View the original trace if needed
 
 ## Configuration
 
