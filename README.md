@@ -69,6 +69,8 @@ Official Link: https://marketplace.visualstudio.com/items?itemName=Recon-Fuzz.re
 
 ## Usage
 
+For a comprehensive overview of how to use the extension for your fuzzing workflows see the [Recon Book](https://book.getrecon.xyz/free_recon_tools/recon_extension.html).
+
 ### Scaffolding a Project
 
 The "Scaffold" button in the Recon Cockpit view will:
