@@ -4,6 +4,7 @@
 
 ### Added
 - Linking libraries (experimental)
+- Improved Medusa.json and Echidna.yaml to match CCA
 
 ## [0.0.25] - 25.06.2025
 
