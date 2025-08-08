@@ -5,7 +5,7 @@ registerHelpers(handlebars);
 
 export const medusaConfigTemplate = handlebars.compile(`{
   "fuzzing": {
-    "workers": 10,
+    "workers": 16,
     "workerResetLimit": 50,
     "timeout": 0,
     "testLimit": 0,
@@ -13,7 +13,7 @@ export const medusaConfigTemplate = handlebars.compile(`{
     "corpusDirectory": "medusa",
     "coverageEnabled": true,
     "deploymentOrder": [
-      "CryticTester"
+
     ],
     "targetContracts": [
       "CryticTester"
@@ -21,8 +21,11 @@ export const medusaConfigTemplate = handlebars.compile(`{
     "targetContractsBalances": [
       "0x27b46536c66c8e3000000"
     ],
+    "predeployedContracts": {
+      "CryticTester": "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+    },
     "constructorArgs": {},
-    "deployerAddress": "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+    "deployerAddress": "0xf5e4fFeB7d2183B61753AA4074d72E51873C1D0a",
     "senderAddresses": [
       "0x10000",
       "0x20000",
@@ -57,7 +60,7 @@ export const medusaConfigTemplate = handlebars.compile(`{
       "propertyTesting": {
         "enabled": true,
         "testPrefixes": [
-          "invariant_"
+          "echidna_"
         ]
       },
       "optimizationTesting": {
@@ -72,7 +75,14 @@ export const medusaConfigTemplate = handlebars.compile(`{
       "cheatCodes": {
         "cheatCodesEnabled": true,
         "enableFFI": false
-      }
+      },
+      "skipAccountChecks": true,
+			"forkConfig": {
+				"forkModeEnabled": false,
+				"rpcUrl": "",
+				"rpcBlock": 1,
+				"poolSize": 20
+			}
     }
   },
   "compilation": {
@@ -86,6 +96,11 @@ export const medusaConfigTemplate = handlebars.compile(`{
       ]
     }
   },
+  "slither": {
+		"useSlither": true,
+		"cachePath": "slither_results.json",
+		"args": []
+	},
   "logging": {
     "level": "info",
     "logDirectory": ""
