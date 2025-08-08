@@ -1,4 +1,5 @@
 import { echidnaConfigTemplate } from './echidna-config';
+import { halmosConfigTemplate } from './halmos-config';
 import { medusaConfigTemplate } from './medusa-config';
 import { beforeAfterTemplate } from './before-after';
 import { cryticTesterTemplate } from './crytic-tester';
@@ -13,6 +14,7 @@ import { targetsTemplate } from './targets/targets';
 
 export {
     echidnaConfigTemplate,
+    halmosConfigTemplate,
     medusaConfigTemplate,
     beforeAfterTemplate,
     cryticTesterTemplate,
