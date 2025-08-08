@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.26] - 29.06.2025
+## [0.0.26] - 08.08.2025
 
 ### Added
 - Linking libraries (experimental)
