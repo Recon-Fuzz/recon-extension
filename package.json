@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Seamless integration of Foundry, Medusa, and Echidna for smart contract testing",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "license": "gpl-2.0",
   "publisher": "Recon-Fuzz",
   "repository": {
@@ -118,6 +118,10 @@
         {
           "command": "recon.logToFoundry",
           "group": "1_conversion"
+        },
+        {
+          "command": "recon.linkLibraries",
+          "group": "2_analysis"
         }
       ]
     },
@@ -219,6 +223,11 @@
       {
         "command": "recon.logToFoundry",
         "title": "Log to Foundry",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.linkLibraries",
+        "title": "Link Libraries (Experimental)",
         "category": "Recon"
       }
     ],
