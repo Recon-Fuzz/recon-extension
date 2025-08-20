@@ -368,6 +368,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     <vscode-radio-group id="fuzzer-selection" value="${defaultFuzzer}">
                         <vscode-radio value="${FuzzerTool.ECHIDNA}">Echidna</vscode-radio>
                         <vscode-radio value="${FuzzerTool.MEDUSA}">Medusa</vscode-radio>
+                        <vscode-radio value="${FuzzerTool.HALMOS}">Halmos</vscode-radio>
                     </vscode-radio-group>
                 </div>
 

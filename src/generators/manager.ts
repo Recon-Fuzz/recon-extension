@@ -14,6 +14,7 @@ export class TemplateManager {
         const SKIP_IF_EXISTS = [
             'echidna.yaml',
             'medusa.json',
+            'halmos.toml',
             `${testFolder}/recon/BeforeAfter.sol`,
             `${testFolder}/recon/CryticTester.sol`,
             `${testFolder}/recon/CryticToFoundry.sol`,

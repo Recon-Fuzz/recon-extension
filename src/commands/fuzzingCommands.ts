@@ -22,6 +22,13 @@ export function registerFuzzingCommands(
             await runFuzzer(Fuzzer.MEDUSA, services, target);
         })
     );
+
+    // Register Halmos command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.runHalmos', async (target?: string) => {
+            await runFuzzer(Fuzzer.HALMOS, services, target);
+        })
+    );
 }
 
 async function runFuzzer(
@@ -47,7 +54,7 @@ async function runFuzzer(
         const mode = config.get<string>('mode', 'assertion');
 
         command = `echidna . --contract ${target || 'CryticTester'} --config echidna.yaml --format text --workers ${workers || 10} --test-limit ${testLimit} --test-mode ${mode}`;
-    } else {
+    } else if (fuzzerType === Fuzzer.MEDUSA) {
         const config = vscode.workspace.getConfiguration('recon.medusa');
         const workers = config.get<number>('workers', 10);
         const testLimit = config.get<number>('testLimit', 0);
@@ -56,11 +63,22 @@ async function runFuzzer(
         if (target !== 'CryticTester') {
             command += ` --target-contracts ${target || 'CryticTester'}`;
         }
+    } else {
+        const config = vscode.workspace.getConfiguration('recon.halmos');
+        const depth = config.get<number>('depth', 22);
+        const unroll = config.get<number>('unroll', 256);
+        const solver = config.get<string>('solver', 'z3');
+
+        command = `halmos --function-name "echidna_" --depth ${depth} --unroll ${unroll} --solver-timeout-assertion 0 --solver-timeout-branch 1 --early-exit --solver ${solver}`;
+        if (target !== 'CryticTester') {
+            command += ` --contract ${target}`;
+        }
     }
 
     // Create output channel for live feedback
     const outputChannel = services.outputService.createFuzzerOutputChannel(
-        fuzzerType === Fuzzer.ECHIDNA ? 'Echidna' : 'Medusa'
+        fuzzerType === Fuzzer.ECHIDNA ? 'Echidna' : 
+        fuzzerType === Fuzzer.MEDUSA ? 'Medusa' : 'Halmos'
     );
     outputChannel.show();
 
@@ -71,7 +89,8 @@ async function runFuzzer(
 
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: fuzzerType === Fuzzer.ECHIDNA ? 'Echidna' : 'Medusa',
+        title: fuzzerType === Fuzzer.ECHIDNA ? 'Echidna' : 
+               fuzzerType === Fuzzer.MEDUSA ? 'Medusa' : 'Halmos',
         cancellable: true
     }, async (progress, token) => {
         return new Promise<void>((resolve, reject) => {
@@ -110,7 +129,7 @@ async function runFuzzer(
 
                         outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
 
-                        // Wait for "Saving test reproducers" for Echidna
+                        // Wait for completion signals for each fuzzer
                         if (fuzzerType === Fuzzer.ECHIDNA) {
                             // Wait for "Saving test reproducers" with 1 minute timeout
                             let waited = 0;
@@ -122,6 +141,13 @@ async function runFuzzer(
                             // Wait for "Test summary:" with 1 minute timeout
                             let waited = 0;
                             while (waited < 60000 && !output.includes("Test summary:")) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                waited += 1000;
+                            }
+                        } else if (fuzzerType === Fuzzer.HALMOS) {
+                            // Wait for "Halmos completed" or similar completion message
+                            let waited = 0;
+                            while (waited < 60000 && !output.includes("Symbolic execution completed")) {
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                                 waited += 1000;
                             }
@@ -266,6 +292,22 @@ async function runFuzzer(
                             progress.report({
                                 message: `Tests: ${failures}/${totalTests} | Calls: ${calls} | Corpus: ${corpus}`,
                                 increment: Math.max(0, increment)
+                            });
+                        }
+                    }
+                } else if (fuzzerType === Fuzzer.HALMOS) {
+                    if (text.includes("Running") || text.includes("PASS") || text.includes("FAIL")) {
+                        hasEnoughData = true;
+                        const passMatch = text.match(/PASS/g);
+                        const failMatch = text.match(/FAIL/g);
+                        const passed = passMatch ? passMatch.length : 0;
+                        const failed = failMatch ? failMatch.length : 0;
+                        const total = passed + failed;
+
+                        if (total > 0) {
+                            progress.report({
+                                message: `Tests: ${failed}/${total} | Passed: ${passed} | Failed: ${failed}`,
+                                increment: 10
                             });
                         }
                     }
