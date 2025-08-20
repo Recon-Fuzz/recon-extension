@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import { getFoundryConfigPath } from './utils';
 import { EchidnaMode, FuzzerTool } from './types';
 
@@ -55,8 +54,10 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     const defaultFuzzer = vscode.workspace.getConfiguration('recon').get<string>('defaultFuzzer', FuzzerTool.ECHIDNA);
                     if (defaultFuzzer === FuzzerTool.ECHIDNA) {
                         vscode.commands.executeCommand('recon.runEchidna', message.value);
-                    } else {
+                    } else if (defaultFuzzer === FuzzerTool.MEDUSA) {
                         vscode.commands.executeCommand('recon.runMedusa', message.value);
+                    } else if (defaultFuzzer === FuzzerTool.HALMOS) {
+                        vscode.commands.executeCommand('recon.runHalmos', message.value);
                     }
                     break;
             }
