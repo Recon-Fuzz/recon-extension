@@ -304,9 +304,12 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         if (e.target.value === '${FuzzerTool.ECHIDNA}') {
                             echidnaSettings.style.display = '';
                             medusaSettings.style.display = 'none';
-                        } else {
+                        } else if (e.target.value === '${FuzzerTool.MEDUSA}') {
                             echidnaSettings.style.display = 'none';
                             medusaSettings.style.display = '';
+                        } else if (e.target.value === '${FuzzerTool.HALMOS}') {
+                            echidnaSettings.style.display = 'none';
+                            medusaSettings.style.display = 'none';
                         }
                         vscode.postMessage({
                             type: 'updateDefaultFuzzer',
@@ -354,7 +357,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     <vscode-button id="fuzz-btn" appearance="primary">
                         <span class="generate-btn-content">
                             <i class="codicon codicon-beaker"></i>
-                            Fuzz with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : 'Medusa'}
+                            Fuzz with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : defaultFuzzer === FuzzerTool.MEDUSA ? 'Medusa' : 'Halmos'}
                         </span>
                     </vscode-button>
                     <vscode-button id="settings-btn" appearance="secondary">
