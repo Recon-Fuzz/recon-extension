@@ -64,15 +64,7 @@ async function runFuzzer(
             command += ` --target-contracts ${target || 'CryticTester'}`;
         }
     } else {
-        const config = vscode.workspace.getConfiguration('recon.halmos');
-        const depth = config.get<number>('depth', 22);
-        const unroll = config.get<number>('unroll', 256);
-        const solver = config.get<string>('solver', 'z3');
-
-        command = `halmos --function-name "echidna_" --depth ${depth} --unroll ${unroll} --solver-timeout-assertion 0 --solver-timeout-branch 1 --early-exit --solver ${solver}`;
-        if (target !== 'CryticTester') {
-            command += ` --contract ${target}`;
-        }
+        command = `halmos --match-contract ${target}`;
     }
 
     // Create output channel for live feedback
@@ -145,9 +137,9 @@ async function runFuzzer(
                                 waited += 1000;
                             }
                         } else if (fuzzerType === Fuzzer.HALMOS) {
-                            // Wait for "Halmos completed" or similar completion message
+                            // Halmos doesn't do shrinking so we shouldn't need to wait much
                             let waited = 0;
-                            while (waited < 60000 && !output.includes("Symbolic execution completed")) {
+                            while (waited < 1000 && !output.includes("HALMOS process completed")) {
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                                 waited += 1000;
                             }
