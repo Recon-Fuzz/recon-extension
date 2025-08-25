@@ -62,7 +62,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return path.join(workspaceRoot, 'recon.json');
     }
 
-    public async loadReconJson(): Promise<Record<string, { functions: FunctionConfig[], separated?: boolean }>> {
+    public async loadReconJson(): Promise<Record<string, { functions: FunctionConfig[], separated?: boolean, enabled?: boolean }>> {
         try {
             const jsonPath = await this.getReconJsonPath();
             const content = await fs.readFile(jsonPath, 'utf8');
@@ -77,7 +77,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    public async saveReconJson(data: Record<string, { functions: FunctionConfig[], separated?: boolean }>) {
+    public async saveReconJson(data: Record<string, { functions: FunctionConfig[], separated?: boolean, enabled?: boolean }>) {
         if (this.isStateSaving) { return; }
 
         try {
@@ -110,7 +110,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                 const savedConfig = reconJson[contract.jsonPath];
 
                 // A contract is enabled if it has any functions configured
-                const isEnabled = savedConfig?.functions?.length > 0;
+                const isEnabled = savedConfig?.enabled ?? false;
 
                 // Initialize empty arrays if needed
                 const functionConfigs = savedConfig?.functions || [];
@@ -132,13 +132,13 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
 
     public async saveState() {
         try {
-            // Save function configs and separated flag to recon.json
             const reconJson = Object.fromEntries(
                 this.contracts
-                    .filter(c => c.enabled && (c.functionConfigs?.length || c.separated === false))
+                    .filter(c => c.enabled)
                     .map(c => [
                         c.jsonPath,
                         {
+                            enabled: true,
                             functions: c.functionConfigs || [],
                             separated: c.separated
                         }
@@ -1349,7 +1349,6 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
 
         const visibleContracts = this.contracts
             .filter(contract =>
-                this.hasMutableFunctions(contract) &&
                 (this.showAllFiles || (contract.name.includes("Mock") && (contract.path.startsWith('test/') || contract.path.startsWith('src/test/'))) || (!contract.path.startsWith('test/') && !contract.path.startsWith('src/test/') && !contract.path.endsWith('.t.sol') && !contract.path.endsWith('.s.sol') && !contract.path.startsWith('lib/') && !contract.path.startsWith('node_modules/') && !contract.path.startsWith('script/')))
             )
             .sort((a, b) => {
