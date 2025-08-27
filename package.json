@@ -376,7 +376,7 @@
     "@recon-fuzz/log-parser": "^0.0.31",
     "@solidity-parser/parser": "^0.20.1",
     "@types/prismjs": "^1.26.5",
-    "@vscode/codicons": "^0.0.38",
+    "@vscode/codicons": "^0.0.39",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "abi-to-mock": "^1.0.11",
     "case": "^1.6.3",
