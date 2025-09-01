@@ -175,7 +175,7 @@ export class LogToFoundryViewProvider {
       let finalTrace = "";
       if (fuzzer === "medusa") {
         finalTrace = medusaLogsToFunctions(trace, index.toString(), vmData);
-      } else if (fuzzer === "halmos") {
+      } else if (fuzzer === "halmos" || fuzzer === "Halmos") {
         finalTrace = halmosSequenceToFunction(
           trace,
           brokenProperty,
