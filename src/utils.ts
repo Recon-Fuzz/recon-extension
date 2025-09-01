@@ -1,4 +1,4 @@
-import { echidnaLogsToFunctions, Fuzzer, medusaLogsToFunctions } from '@recon-fuzz/log-parser';
+import { echidnaLogsToFunctions, Fuzzer, halmosSequenceToFunction, medusaLogsToFunctions } from '@recon-fuzz/log-parser';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -100,7 +100,14 @@ export const prepareTrace = (fuzzer: Fuzzer, prefix: string, trace: string, brok
     }
     else if (fuzzer === Fuzzer.ECHIDNA) {
         finalTrace = echidnaLogsToFunctions(trace, prefix, brokenProperty, vmData);
-    }
+  } else if (fuzzer === Fuzzer.HALMOS) {
+    finalTrace = halmosSequenceToFunction(
+      trace,
+      brokenProperty,
+      prefix,
+      parseInt(prefix)
+    );
+  }
     const functionName = finalTrace
         .split("() public")[0]
         .replace("function ", "");
