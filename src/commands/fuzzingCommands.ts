@@ -93,7 +93,7 @@ async function runFuzzer(
 
     command = `halmos --match-contract ${
       target || "CryticTester"
-    } --loop ${unroll} --depth ${depth} --solver-timeout-assertion 0 --solver ${solver}`;
+    } --loop ${unroll} --solver-timeout-assertion 0 --solver ${solver}`;
   }
 
   // Create output channel for live feedback
@@ -312,7 +312,7 @@ async function runFuzzer(
         // Handle process output
         childProcess.stdout.on("data", (data: Buffer) => {
           const text =
-            fuzzerType === Fuzzer.MEDUSA
+            fuzzerType === Fuzzer.MEDUSA || fuzzerType === Fuzzer.HALMOS
               ? stripAnsiCodes(data.toString())
               : data.toString();
           output += text;
