@@ -48,6 +48,13 @@ function conditionallyAddMemoryLocation(
     return internalType || type;
 }
 
+function extractType(inputOrOutput: ParamDefinition): string {
+    if (inputOrOutput.internalType) {
+        return inputOrOutput.internalType;
+    }
+    return inputOrOutput.type;
+}
+
 export function registerHelpers(handlebars: typeof Handlebars) {
     handlebars.registerHelper('snake', function (str: string): string {
         return snake(str);
@@ -86,7 +93,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
                 ? abi.outputs
                     .map(
                         (output: ParamDefinition, index: number) =>
-                            `${conditionallyAddMemoryLocation(output.type, output.internalType)} ${output.name !== "" ? output.name : `value${index}`
+                            `${conditionallyAddMemoryLocation(output.type, extractType(output))} ${output.name !== "" ? output.name : `value${index}`
                             };`
                     )
                     .join("\n        ")
@@ -96,7 +103,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
                 ? abi.outputs
                     .map(
                         (output: ParamDefinition, index: number) =>
-                            `${conditionallyAddMemoryLocation(output.type, output.internalType)} ${output.name !== ""
+                            `${conditionallyAddMemoryLocation(output.type, extractType(output))} ${output.name !== ""
                                 ? `temp${capitalizeFirstLetter(output.name!)}`
                                 : `tempValue${index}`
                             }`
@@ -122,7 +129,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
     function ${contractName}_${abi.name}(${abi.inputs
                     .map(
                         (input: ParamDefinition) =>
-                            `${conditionallyAddMemoryLocation(input.type, input.internalType)} ${input.name
+                            `${conditionallyAddMemoryLocation(input.type, extractType(input))} ${input.name
                             }`
                     )
                     .join(", ")}) public ${modifiersStr}{
@@ -139,7 +146,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
     function ${contractName}_${abi.name}(${abi.inputs
                     .map(
                         (input: ParamDefinition) =>
-                            `${conditionallyAddMemoryLocation(input.type, input.internalType)} ${input.name
+                            `${conditionallyAddMemoryLocation(input.type, extractType(input))} ${input.name
                             }`
                     )
                     .join(", ")}) public ${modifiersStr}{
