@@ -99,7 +99,7 @@
         },
         {
           "command": "recon.generateTargetFunctions",
-          "when": "resourceExtname == .json || resourceExtname == .sol",
+          "when": "resourceExtname == .json || resourceExtname == .sol || resourceExtname == .vy",
           "group": "2_workspace"
         },
         {
