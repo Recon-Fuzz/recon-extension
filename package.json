@@ -94,7 +94,7 @@
       "explorer/context": [
         {
           "command": "recon.generateMock",
-          "when": "resourceExtname == .json || resourceExtname == .sol",
+          "when": "resourceExtname == .json || resourceExtname == .sol || resourceExtname == .vy",
           "group": "2_workspace"
         },
         {

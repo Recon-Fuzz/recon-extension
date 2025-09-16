@@ -47,6 +47,21 @@ export function registerMockCommands(
                         );
                         return;
                     }
+                } else if (uri.fsPath.endsWith('.vy')) {
+                    // Find corresponding JSON ABI file for the Vyper file
+                    const vyperFileName = path.basename(uri.fsPath, '.vy');
+                    const outDir = await findOutputDirectory(workspaceRoot);
+                    const expectedJsonPath = path.join(outDir, `${vyperFileName}.vy`, `${vyperFileName}.json`);
+
+                    try {
+                        await fs.access(expectedJsonPath);
+                        abiFilePath = expectedJsonPath;
+                    } catch (err) {
+                        vscode.window.showErrorMessage(
+                            `Couldn't find compiled ABI for ${vyperFileName}.sol. Please build the project first.`
+                        );
+                        return;
+                    }
                 } else {
                     // It's a JSON file, use it directly
                     abiFilePath = uri.fsPath;
