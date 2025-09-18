@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.27] - 18.09.2025
+
+### Added
+- Argus call graph
+
 ## [0.0.26] - 08.08.2025
 
 ### Added
@@ -60,6 +65,7 @@
 - Coverage report compatibility with new Medusa report format
 - Issue with fuzzer not stopping
 
+[0.0.27]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.27
 [0.0.26]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.26
 [0.0.25]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.25
 [0.0.24]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.24
