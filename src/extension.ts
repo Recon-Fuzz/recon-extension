@@ -9,6 +9,7 @@ import { OutputService } from './services/outputService';
 import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
+import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
 
 export async function activate(context: vscode.ExtensionContext) {   
     // Create services
@@ -60,6 +61,33 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('recon.logToFoundry', () => {
             const provider = new LogToFoundryViewProvider(context.extensionUri);
             provider.createWebviewPanel();
+        })
+    );
+
+    // Register Argus custom editor provider
+    const argusProvider = new ArgusCallGraphEditorProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerCustomEditorProvider(ArgusCallGraphEditorProvider.viewType, argusProvider)
+    );
+
+    // Command to open current Solidity file with Argus preview
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.previewArgusCallGraph', async () => {
+            const active = vscode.window.activeTextEditor;
+            if (!active || active.document.languageId !== 'solidity') {
+                vscode.window.showInformationMessage('Open a Solidity (.sol) file first.');
+                return;
+            }
+            // Open Argus preview to the side (similar to Markdown preview behavior)
+            await vscode.commands.executeCommand(
+                'vscode.openWith',
+                active.document.uri,
+                ArgusCallGraphEditorProvider.viewType,
+                {
+                    viewColumn: vscode.ViewColumn.Beside,
+                    preserveFocus: true
+                }
+            );
         })
     );
 }

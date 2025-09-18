@@ -21,6 +21,18 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "customEditors": [
+      {
+        "viewType": "recon.argusCallGraph",
+        "displayName": "Argus Call Graph",
+        "selector": [
+          {
+            "filenamePattern": "**/*.sol"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -35,17 +47,20 @@
         {
           "type": "webview",
           "id": "recon-contracts",
-          "name": "Contracts"
+          "name": "Contracts",
+          "icon": "images/icon.svg"
         },
         {
           "type": "webview",
           "id": "recon-main",
-          "name": "Recon Cockpit"
+          "name": "Recon Cockpit",
+          "icon": "images/icon.svg"
         },
         {
           "type": "webview",
           "id": "recon-coverage",
-          "name": "Coverage Reports"
+          "name": "Coverage Reports",
+          "icon": "images/icon.svg"
         }
       ]
     },
@@ -68,27 +83,39 @@
         {
           "command": "recon.showAllFiles",
           "when": "view == recon-contracts && !recon.showingAllFiles",
-          "group": "navigation"
+          "group": "navigation",
+          "icon": "$(eye)"
         },
         {
           "command": "recon.refreshContracts",
           "when": "view == recon-contracts",
-          "group": "navigation"
+          "group": "navigation",
+          "icon": "$(refresh)"
         },
         {
           "command": "recon.hideAllFiles",
           "when": "view == recon-contracts && recon.showingAllFiles",
-          "group": "navigation"
+          "group": "navigation",
+          "icon": "$(eye-closed)"
         },
         {
           "command": "recon.refreshCoverage",
           "when": "view == recon-coverage",
-          "group": "navigation"
+          "group": "navigation",
+          "icon": "$(refresh)"
         },
         {
           "submenu": "recon.tools",
           "when": "view == recon-main",
           "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "recon.previewArgusCallGraph",
+          "when": "resourceExtname == .sol",
+          "group": "navigation@9",
+          "icon": "$(graph)"
         }
       ],
       "explorer/context": [
@@ -229,6 +256,18 @@
         "command": "recon.linkLibraries",
         "title": "Link Libraries (Experimental)",
         "category": "Recon"
+      },
+      {
+        "command": "recon.previewArgusCallGraph",
+        "title": "Preview Argus Call Graph",
+        "category": "Recon",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "recon.buildWithInfo",
+        "title": "Forge Build (with build-info)",
+        "category": "Recon",
+        "icon": "$(debug-restart)"
       }
     ],
     "configuration": {
@@ -382,8 +421,10 @@
     "case": "^1.6.3",
     "echidna-coverage-parser": "^1.0.1",
     "handlebars": "^4.7.8",
+    "html2canvas": "^1.4.1",
     "jsdom": "^26.1.0",
     "prismjs": "^1.30.0",
+    "solc-typed-ast": "^18.2.5",
     "yaml": "^2.8.0"
   }
 }
