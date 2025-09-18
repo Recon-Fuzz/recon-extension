@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { CallType } from './types';
 import { generateCombinedHTMLTree, getFunctionName } from './utils';
+import { processSlots } from './slot';
 import { processContract } from './processor';
 import { findOutputDirectory } from '../utils';
 
@@ -99,6 +100,8 @@ export async function generateCallGraph(options: ArgusGenerateOptions): Promise<
       try {
         const processed = processContract(contract, options.includeAll, options.includeDeps);
         if (processed.vFunctions.length === 0) continue;
+        // Always compute storage slot layout so slots viewer is shown regardless of includeAll flag
+        const slotData = processSlots(contract);
         let html = generateCombinedHTMLTree(
           processed.vFunctions,
           contract.name,
@@ -110,7 +113,7 @@ export async function generateCallGraph(options: ArgusGenerateOptions): Promise<
             vUserDefinedValueTypes: processed.vUserDefinedValueTypes
           },
           options.includeAll,
-          undefined
+          slotData
         );
         html = sanitizeGraphHtml(html);
         html = injectPrism(html);
@@ -233,47 +236,120 @@ function injectPrism(html: string): string {
       var p = el.getAttribute('data-path'); var title = el.getAttribute('data-title'); if(p && w.loadContent) w.loadContent(p, title);
     }
   });`;
-  const darkCss = `:root { --argus-bg: var(--vscode-editor-background); --argus-panel-bg: var(--vscode-editorWidget-background, #1e1e1e); --argus-border: var(--vscode-editorWidget-border, #333); --argus-accent: var(--vscode-editorLineNumber-activeForeground, #569CD6); --argus-text: var(--vscode-editor-foreground, #d4d4d4); }
-  body, .container, .functions-container, .node-header, .node-actions, .stats-panel, .element-content, .internal-function-code pre, .internal-function-callers, .internal-function-header { background: var(--argus-panel-bg) !important; color: var(--argus-text) !important; }
-  body { background: var(--argus-bg) !important; }
-  .container { box-shadow: none !important; border:1px solid var(--argus-border); }
-  .node-header { border:1px solid var(--argus-border); }
-  .node-header:hover { background: rgba(255,255,255,0.05) !important; }
-  .node-content { border:1px solid var(--argus-border); }
-  .stats-panel { border:1px solid var(--argus-border); }
-  .element-item pre, .node-content pre, .internal-function-code pre { background: #1e1e1e !important; }
-  .action-btn:hover, .export-btn:hover { filter:brightness(1.1); }
-  .element-count { background: linear-gradient(135deg,var(--argus-accent),#267dbe) !important; box-shadow:none !important; }
-  h1, .node-name, .internal-function-name, .element-label, .slot-label, .ruler-label, .ruler-tick { color: var(--argus-text) !important; }
-  .byte-cell.empty { background: rgba(86,156,214,0.15) !important; }
-  .byte-cell.occupied { background: #0e639c !important; }
-  .warning-bg { background:#3d3a1a !important; border-color:#776f2a !important; }
-  .danger-bg { background:#5a1e23 !important; border-color:#7a2d33 !important; }
-  .info-panel { background:#094771 !important; border-color:#0e639c !important; }
-  .element-item { border-bottom:1px solid rgba(255,255,255,0.05) !important; }
+  const darkCss = `/*
+  Argus Call Graph Embedded Styles
+  ------------------------------------------------------------------
+  Token Mapping (design system -> CSS variable)
+  - back-neutral-primary (page background)        -> --argus-bg
+  - card/panel base (rest)                        -> --argus-surface-1
+  - card hover / subtle raised                    -> --argus-surface-2
+  - card pressed / active                         -> --argus-surface-3
+  - fill-accent-primary (primary button rest)     -> --argus-accent
+  - fill-accent-primary (hover)                   -> --argus-accent-hover
+  - fill-accent-primary (pressed)                 -> --argus-accent-active
+  - fill-accent-alt-* (lighter accent variants)   -> --argus-accent-alt / hover
+  - fore-neutral-primary (strong text)            -> --argus-text-strong
+  - fore-neutral-secondary (body text)            -> --argus-text
+  - fore-neutral-tertiary (muted)                 -> --argus-text-muted
+  - fore-neutral-quaternary (faint)               -> --argus-text-faint
+  - stroke-neutral-decorative / borders           -> --argus-border
+  - stroke-strong                                 -> --argus-border-strong
+  - accent stroke                                 -> --argus-border-accent
+  - focus ring (accent glow)                      -> --argus-focus-ring
+  - semantic info / warn / danger backgrounds     -> --argus-info-bg / --argus-warn-bg / --argus-danger-bg
+  - code background                               -> --argus-code-bg
+  Additions:
+  - scroll thumb colors                           -> --argus-scroll-thumb / hover
+  ------------------------------------------------------------------ */
+  /* Design Tokens (Dark) inspired by system design */
+  :root {
+    /* Background surfaces */
+    --argus-bg: #1f1d27; /* page background (closest to back-neutral-primary) */
+    --argus-surface-1: #221f2b; /* card / panel base */
+    --argus-surface-2: #2a2733; /* raised / hovered */
+    --argus-surface-3: #322f3b; /* active / pressed */
+    /* Accent scale (primary -> tertiary) */
+    --argus-accent: #6f5af6; /* primary accent default */
+    --argus-accent-hover: #5d47f2;
+    --argus-accent-active: #4b39d6;
+    --argus-accent-alt: #8a7bfa; /* lighter alt */
+    --argus-accent-alt-hover: #7b6cf5;
+    /* Text colors */
+    --argus-text-strong: #ffffff;
+    --argus-text: #d5d3de; /* body text */
+    --argus-text-muted: #9b97aa;
+    --argus-text-faint: #6b6779;
+    /* Borders / outlines */
+    --argus-border: #3a3646;
+    --argus-border-strong: #4a4556;
+    --argus-border-accent: #6f5af6;
+    /* States */
+    --argus-focus-ring: 0 0 0 2px rgba(111,90,246,0.6);
+    --argus-scroll-thumb: #3e3950;
+    --argus-scroll-thumb-hover: #4a4460;
+    /* Semantic backgrounds */
+    --argus-info-bg: #21324a;
+    --argus-info-border: #2f4d73;
+    --argus-warn-bg: #403519;
+    --argus-warn-border: #6b5520;
+    --argus-danger-bg: #47262a;
+    --argus-danger-border: #6f373d;
+    /* Code */
+    --argus-code-bg: #1e1d26;
+  }
+  body { background: var(--argus-bg) !important; color: var(--argus-text); }
+  .container { background: var(--argus-surface-1) !important; border:1px solid var(--argus-border); border-radius:8px; }
+  h1, .node-name, .internal-function-name { color: var(--argus-text-strong) !important; font-weight:600; }
+  .node-header { background: var(--argus-surface-1) !important; border:1px solid var(--argus-border); border-radius:6px; padding:6px 10px; }
+  .node-header:hover { background: var(--argus-surface-2) !important; }
+  .node-header:active { background: var(--argus-surface-3) !important; }
+  .node-content { border:1px solid var(--argus-border); background: var(--argus-surface-2) !important; border-radius:6px; }
+  .stats-panel { border:1px solid var(--argus-border); background: var(--argus-surface-1) !important; border-radius:8px; }
+  .internal-function-code pre, .element-item pre, .node-content pre { background: var(--argus-code-bg) !important; }
+  .element-count { background: var(--argus-accent); color: #fff !important; border-radius:999px; font-weight:600; }
+  .element-item { border-bottom:1px solid var(--argus-border); }
+  .element-item:hover { background: var(--argus-surface-2) !important; }
   .element-content.collapsed { display:none !important; }
-  .slots-ruler { border-bottom:1px solid var(--argus-border) !important; }
-  .ruler-byte { background: rgba(86,156,214,0.08) !important; box-shadow: 0 0 0 0 black, 1px 0 0 0 #333 !important; }
   .node-children { border-left:2px solid var(--argus-accent) !important; }
-  .element-count { color:#fff !important; }
-  .node-toggle { color: var(--argus-accent) !important; }
-  .internal-function-callers { background:#094771 !important; border-color:#0e639c !important; }
-  .caller-link { color: var(--argus-accent) !important; }
+  .node-toggle { color: var(--argus-accent); }
+  .byte-cell.empty { background: var(--argus-surface-2) !important; }
+  /* Storage slot grid separators */
+  .byte-cell { border-left:1px solid var(--argus-border); box-shadow:none !important; margin:0 !important; }
+  .slot-bytes .byte-cell:first-child { border-left:none; }
+  .warning-bg { background: var(--argus-warn-bg) !important; border-color: var(--argus-warn-border) !important; }
+  .danger-bg { background: var(--argus-danger-bg) !important; border-color: var(--argus-danger-border) !important; }
+  .info-panel { background: var(--argus-info-bg) !important; border-color: var(--argus-info-border) !important; }
+  .internal-function-callers { background: var(--argus-info-bg) !important; border-color: var(--argus-info-border) !important; }
+
+  /* Buttons */
+  .export-btn, .action-btn { background: var(--argus-accent); color:#fff; border:1px solid var(--argus-accent); border-radius:8px; padding:6px 14px; font-weight:500; font-family: inherit; cursor:pointer; transition: background .15s, box-shadow .15s, transform .15s; }
+  .export-btn:hover, .action-btn:hover { background: var(--argus-accent-hover); }
+  .export-btn:active, .action-btn:active { background: var(--argus-accent-active); transform:translateY(1px); }
+  .export-btn:focus-visible, .action-btn:focus-visible { outline:none; box-shadow: var(--argus-focus-ring); }
+  .export-btn.secondary, .action-btn.secondary { background: var(--argus-surface-2); color: var(--argus-text); border:1px solid var(--argus-border); }
+  .export-btn.secondary:hover, .action-btn.secondary:hover { background: var(--argus-surface-3); }
+  .export-btn.outline, .action-btn.outline { background: transparent; color: var(--argus-text); border:1px solid var(--argus-border-accent); }
+  .export-btn.outline:hover, .action-btn.outline:hover { background: var(--argus-surface-2); }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--argus-scroll-thumb); border-radius:6px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--argus-scroll-thumb-hover); }
   /* Contract Elements sidebar overrides for dark theme */
   .contract-elements-sidebar .sidebar-content,
   .contract-elements-sidebar .element-content,
   .contract-elements-sidebar .node-header,
   .contract-elements-sidebar .element-item,
-  .contract-elements-sidebar .sidebar-header h3 { background: var(--argus-panel-bg) !important; color: var(--argus-text) !important; }
-  .contract-elements-sidebar .element-content { border:1px solid var(--argus-border) !important; border-top:none !important; }
-  .contract-elements-sidebar .node-header { background: var(--argus-panel-bg) !important; }
-  .contract-elements-sidebar .node-header:hover,
-  .contract-elements-sidebar .element-item:hover { background: rgba(255,255,255,0.05) !important; }
+  .contract-elements-sidebar .sidebar-header h3 { background: var(--argus-surface-1) !important; color: var(--argus-text) !important; }
+  .contract-elements-sidebar .element-content { margin-left: 10px; margin-right: 10px; }
+  .contract-elements-sidebar .node-header { background: var(--argus-surface-1) !important; }
+  .contract-elements-sidebar .node-header:hover { background: var(--argus-surface-2) !important; }
+  .contract-elements-sidebar .element-item:hover { background: var(--argus-surface-2) !important; }
   .contract-elements-sidebar .element-item { transition: background-color .15s ease; }
   .contract-elements-sidebar .element-toggle,
   .contract-elements-sidebar .element-label { color: var(--argus-text) !important; }
-  .contract-elements-sidebar .element-count { box-shadow:none !important; }
-  .contract-elements-sidebar .element-item pre { background:#1e1e1e !important; }
+  .contract-elements-sidebar .element-count { background: var(--argus-accent); box-shadow:none !important; }
+  .contract-elements-sidebar .element-item pre { background: var(--argus-code-bg) !important; }
   .contract-elements-sidebar .element-item code { color: var(--argus-text) !important; }
 `;
   // Inline only Prism + delegation here (html2canvas now injected in host head)

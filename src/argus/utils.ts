@@ -305,14 +305,14 @@ function generateSlotsViewer(slots?: {
                 </div>
                 <div class="element-content collapsed" id="constants-section">
                     ${slots.constants
-                      .map(
-                        (constant) => `
+        .map(
+          (constant) => `
                         <div class="element-item">
                             <pre><code class="language-solidity">${escapeHtml(constant.source)};</code></pre>
                         </div>
                     `
-                      )
-                      .join('')}
+        )
+        .join('')}
                 </div>
             </div>
         `;
@@ -325,20 +325,20 @@ function generateSlotsViewer(slots?: {
             <div class="ruler-bytes">
                 <div class="tick-section">
                     ${Array.from({ length: 17 }, (_, i) => {
-                      const pos = 32 - i * 2;
-                      return `<div class="ruler-section"><div class="ruler-tick">${pos}</div></div>`;
-                    }).join('')}
+    const pos = 32 - i * 2;
+    return `<div class="ruler-section"><div class="ruler-tick">${pos}</div></div>`;
+  }).join('')}
                 </div>
                 ${Array.from({ length: 16 }, (_, i) => {
-                  const pos = 32 - i * 2;
-                  const showBorder = pos % 8 === 0;
-                  return `
+    const pos = 32 - i * 2;
+    const showBorder = pos % 8 === 0;
+    return `
                         <div class="ruler-section">
-                            <div class="ruler-byte" style="box-shadow: ${showBorder ? '-2px 0 0 0 black, 1px 0 0 0 #dee2e6' : '0 0 0 0 black, 1px 0 0 0 #dee2e6'};"></div>
+                            <div class="ruler-byte" style="box-shadow: ${showBorder ? '-2px 0 0 0 white, 1px 0 0 0 var(--argus-border)' : '0 0 0 0 white, 1px 0 0 0 var(--argus-border)'};"></div>
                             <div class="ruler-byte"></div>
                         </div>
                     `;
-                }).join('')}
+  }).join('')}
             </div>
         </div>
     `;
@@ -359,18 +359,18 @@ function generateSlotsViewer(slots?: {
                 <div class="slot-bytes">
                     ${Array.from({ length: emptyBytes }, () => '<div class="byte-cell empty"></div>').join('')}
                     ${slotMembers
-                      .slice()
-                      .reverse()
-                      .map(
-                        (member) => `
+          .slice()
+          .reverse()
+          .map(
+            (member) => `
                         <div class="byte-cell occupied" 
-                             style="flex: ${member.size}; background-color: ${member.parent ? '#10b981' : '#3b82f6'};"
+                             style="flex: ${member.size}; background-color: ${member.parent ? 'var(--argus-warn-bg)' : 'var(--argus-accent-active)'};"
                              title="${member.parent ? `${member.parent.type} ${member.parent.name} -> ${member.type} ${member.name}` : `${member.type} ${member.name}`}&#10;Visibility: ${member.visibility}&#10;Size: ${member.size} bytes&#10;Offset: ${member.offset}">
                             ${member.size === 1 ? '●' : `${member.type} ${member.name}`}
                         </div>
                     `
-                      )
-                      .join('')}
+          )
+          .join('')}
                 </div>
             </div>
         `;
@@ -420,14 +420,14 @@ function generateContractElementsSidebar(contractElements?: ContractElements): s
                     </div>
                     <div class="element-content collapsed" id="${sectionId}">
                         ${elements
-                          .map(
-                            (element: ASTNode) => `
+          .map(
+            (element: ASTNode) => `
                             <div class="element-item">
                                 <pre><code class="language-solidity">${escapeHtml(toSource(element))}</code></pre>
                             </div>
                         `
-                          )
-                          .join('')}
+          )
+          .join('')}
                     </div>
                 </div>
             `;
@@ -541,7 +541,7 @@ function generateInternalFunctionsSection(
       <div class="internal-function-item">
         <div class="internal-function-header">
           <span class="internal-function-name">${escapeHtml(functionName)}</span>
-          <span class="internal-function-path">${escapeHtml(absolutePath)}</span>
+          <span class="node-path">${escapeHtml(absolutePath)}</span>
         </div>
         <div class="internal-function-callers">
           <strong>Called by:</strong> ${callersLinksHtml}
@@ -676,9 +676,7 @@ ${indent}  </div>`;
   });
 
   // Generate internal functions section (only for all functions view)
-  const internalFunctionsHtml = isAllFunctions
-    ? generateInternalFunctionsSection(collectInternalFunctionsWithCallers(functions))
-    : '';
+  const internalFunctionsHtml = generateInternalFunctionsSection(collectInternalFunctionsWithCallers(functions));
 
   // Generate slots viewer and contract elements sidebar
   const slotsViewerHtml = generateSlotsViewer(slots);
@@ -713,14 +711,27 @@ ${indent}  </div>`;
         
         h1 {
             color: #2c3e50;
-            border-bottom: 3px solid #3498db;
             padding-bottom: 10px;
             margin-bottom: 30px;
         }
+    /* Title row to place action buttons inline with contract name */
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+      border-bottom: 3px solid var(--argus-accent);
+    }
+    .title-row h1 { margin: 0; }
+    .action-buttons.header-actions { 
+      margin: 0; 
+      justify-content: flex-end; 
+    }
         
         .tree-node {
-            margin-bottom: 10px;
-            border-left: 2px solid #e9ecef;
+            border-left: 2px solid var(--argus-accent);
             position: relative;
         }
         
@@ -730,11 +741,11 @@ ${indent}  </div>`;
             justify-content: space-between;
             padding: 8px 12px;
             background: #f8f9fa;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--argus-border);
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
-            margin-bottom: 5px;
+            margin-top: 5px;
         }
         
         .node-header:hover {
@@ -756,7 +767,7 @@ ${indent}  </div>`;
         
         .node-name {
             font-weight: 600;
-            color: #495057;
+            color: var(--argus-text);
             font-size: 14px;
         }
         
@@ -773,8 +784,8 @@ ${indent}  </div>`;
         
         .node-content {
             margin-left: 20px;
-            margin-bottom: 15px;
-            border: 1px solid #dee2e6;
+            margin-top: 5px;
+            border: 1px solid var(--argus-border);
             border-radius: 6px;
             overflow: hidden;
         }
@@ -845,7 +856,7 @@ ${indent}  </div>`;
         
         .stats-panel {
             background: #f8f9fa;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--argus-border);
             border-radius: 6px;
             padding: 15px;
             margin-bottom: 20px;
@@ -861,12 +872,12 @@ ${indent}  </div>`;
         .stat-number {
             font-size: 24px;
             font-weight: bold;
-            color: #495057;
+            color: var(--argus-accent-alt);
         }
-        
-                 .stat-label {
-             font-size: 12px;
-             color: #6c757d;
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--argus-accent);
              text-transform: uppercase;
          }
          
@@ -902,7 +913,7 @@ ${indent}  </div>`;
             gap: 4px;
             padding: 10px 15px;
             background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
+            border-top: 1px solid var(--argus-border);
         }
         
         .export-btn {
@@ -943,14 +954,13 @@ ${indent}  </div>`;
         }
         
         .element-section {
-            margin-top: 8px;
             overflow: hidden;
         }
         
         .element-toggle {
             margin-right: 10px;
             font-size: 14px;
-            color: #495057;
+            color: var(--argus-text);
             transition: transform 0.2s;
             font-weight: bold;
         }
@@ -963,7 +973,7 @@ ${indent}  </div>`;
             flex: 1;
             font-weight: 600;
             font-size: 14px;
-            color: #495057;
+            color: var(--argus-text);
         }
         
         .element-count {
@@ -1016,20 +1026,20 @@ ${indent}  </div>`;
             display: flex;
             min-height: 100vh;
         }
-        
+
         .slots-ruler {
             display: flex;
             align-items: center;
             margin-bottom: 10px;
             padding-bottom: 10px;
-            border-bottom: 2px solid #e9ecef;
+            border-bottom: 2px solid var(--argus-border);
         }
         
         .ruler-label {
             width: 90px;
             font-size: 12px;
             font-weight: 600;
-            color: #495057;
+            color: var(--argus-text);
             font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
         }
         
@@ -1049,16 +1059,16 @@ ${indent}  </div>`;
             position: absolute;
             flex: 1;
             display: flex;
-            left: -35px;
-            right: -34px;
+            left: -26px;
+            right: -26px;
             top: -16px;
         }
         .ruler-byte {
             flex: 1;
             height: 28px;
             background: rgba(102, 126, 234, 0.1);
-            /*border-right: 1px solid #dee2e6;*/
-            box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;
+            /*border-right: 1px solid var(--argus-border);*/
+            box-shadow: 0 0 0 0 white, 1px 0 0 0 var(--argus-accent-alt);
             position: relative;
             display: flex;
             align-items: end;
@@ -1068,7 +1078,7 @@ ${indent}  </div>`;
         .ruler-tick {
             font-size: 10px;
             font-weight: 600;
-            color: #495057;
+            color: var(--argus-text);
             font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
         }
         
@@ -1082,7 +1092,7 @@ ${indent}  </div>`;
             width: 90px;
             font-size: 11px;
             font-weight: 600;
-            color: #495057;
+            color: var(--argus-text);
             font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
             cursor: help;
         }
@@ -1094,7 +1104,7 @@ ${indent}  </div>`;
         
         .byte-cell {
             height: 32px;
-            box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;
+            box-shadow: 0 0 0 0 white, 1px 0 0 0 var(--argus-border);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1125,6 +1135,7 @@ ${indent}  </div>`;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
+        
         
         .action-buttons {
             display: flex;
@@ -1194,26 +1205,23 @@ ${indent}  </div>`;
         }
         
         .internal-function-header {
-            background: #f1f3f4;
+            background: var(--argus-surface-3);
             padding: 8px 12px;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--argus-surface-2);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-radius: 4px 4px 0 0;
         }
         
         .internal-function-name {
             font-weight: 600;
-            font-size: 16px;
-            color: #495057;
-            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+            font-size: 14px;
+            color: var(--argus-text);
         }
         
         .internal-function-path {
             font-size: 11px;
             color: #6c757d;
-            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
             opacity: 0.7;
             max-width: 300px;
             overflow: hidden;
@@ -1224,28 +1232,28 @@ ${indent}  </div>`;
         .internal-function-callers {
             background: #e8f4fd;
             padding: 8px 12px;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--argus-border);
             font-size: 13px;
-            color: #495057;
+            color: var(--argus-text);
         }
         
         .internal-function-callers strong {
-            color: #1976d2;
+            color: var(--argus-accent-alt);
             margin-right: 5px;
         }
         
         .caller-link {
-            color: #007bff;
+            color: white;
+            font-size: 11px;
             text-decoration: none;
             font-weight: 500;
             padding: 2px 6px;
             border-radius: 4px;
             transition: all 0.2s;
-            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
         }
         
         .caller-link:hover {
-            background-color: #007bff;
+            background-color: var(--argus-accent);
             color: white;
             text-decoration: none;
             transform: translateY(-1px);
@@ -1257,7 +1265,8 @@ ${indent}  </div>`;
         }
         
         .internal-function-code {
-            background: #2d3748;
+          border: 1px solid var(--argus-border);
+            background: var(--argus-surface-2);
         }
         
         .internal-function-code pre {
@@ -1272,32 +1281,24 @@ ${indent}  </div>`;
         .internal-function-code code {
             display: block;
             padding: 12px;
-            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
         }
     </style>
 </head>
 <body>
     <div class="main-container">
         <div class="container">
-            <h1>📊 ${escapeHtml(contractName)}</h1>
-        
-      ${
-        !isAllFunctions
-          ? `
-        <div class="action-buttons">
-            <button class="action-btn expand-all-btn" data-action="expand-all" title="Expand all function trees">
-                🔍 Expand All Code
-            </button>
-            <button class="action-btn export-image-btn" data-action="export-image" title="Export page as image">
-                📷 Export as Image
-            </button>
+      <div class="title-row">
+        <h1>🧬 ${escapeHtml(contractName)}</h1>
+        <div class="action-buttons header-actions">
+          <button class="action-btn expand-all-btn" data-action="expand-all" title="Expand all function trees">
+            🔍 Expand All
+          </button>
+          <button class="action-btn export-image-btn" data-action="export-image" title="Export page as image">
+            📷 Export as Image
+          </button>
         </div>
-      `
-          : ''
-      }
-        ${
-          isAllFunctions
-            ? `<div class="stats-panel">
+      </div>
+       <div class="stats-panel">
             <div class="stat-item">
                 <div class="stat-number">${functions.length}</div>
                 <div class="stat-label">Total Functions</div>
@@ -1310,17 +1311,15 @@ ${indent}  </div>`;
                 <div class="stat-number">${functions.reduce((sum, f) => sum + countExternalCalls(f), 0)}</div>
                 <div class="stat-label">External Calls</div>
             </div>
-        </div>`
-            : ''
-        }
+        </div>
         
         <div class="functions-container">
             ${allFunctionsHtml}
         </div>
         
-        ${isAllFunctions ? slotsViewerHtml : ''}
-        ${isAllFunctions ? contractElementsHtml : ''}
-        ${isAllFunctions ? internalFunctionsHtml : ''}
+        ${slotsViewerHtml}
+        ${contractElementsHtml}
+        ${internalFunctionsHtml}
     </div>
 </div>
   <!-- External Prism scripts removed; local inline assets injected in host -->
@@ -1480,22 +1479,30 @@ ${indent}  </div>`;
             button.innerHTML = '📸 Capturing...';
             button.disabled = true;
 
-            const element = document.querySelector('.container');
-            if(!element){
-                console.warn('[Argus] exportAsImage: .container not found');
-                button.innerHTML = '❌ No container';
-                setTimeout(() => { button.innerHTML = originalText; button.disabled = false; }, 1800);
-                return;
-            }
-            console.log('[Argus] exportAsImage container scroll dims', element.scrollWidth, element.scrollHeight, 'client', element.clientWidth, element.clientHeight);
+            // Capture the entire document (full scrollable body) rather than just the inner .container
+            const element = document.body;
+            const docEl = document.documentElement;
+            const fullWidth = Math.max(
+              element.scrollWidth,
+              docEl.scrollWidth,
+              element.clientWidth,
+              docEl.clientWidth
+            );
+            const fullHeight = Math.max(
+              element.scrollHeight,
+              docEl.scrollHeight,
+              element.clientHeight,
+              docEl.clientHeight
+            );
+            console.log('[Argus] exportAsImage full page dims', { fullWidth, fullHeight });
             const options = {
                 allowTaint: true,
                 useCORS: true,
                 scale: 2,
                 scrollX: 0,
                 scrollY: 0,
-                width: element.scrollWidth,
-                height: element.scrollHeight,
+                width: fullWidth,
+                height: fullHeight,
                 backgroundColor: '#1e1e1e'
             };
       const w = window;
@@ -1842,13 +1849,13 @@ export function generateNavigationIndex(contracts: ContractInfo[]): string {
         .content-header {
             background: white;
             padding: 15px 20px;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--argus-border);
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .content-title {
             font-size: 18px;
-            color: #495057;
+            color: var(--argus-text);
             margin: 0;
         }
         
@@ -1892,7 +1899,7 @@ export function generateNavigationIndex(contracts: ContractInfo[]): string {
         
         .feature-list li {
             padding: 8px 0;
-            color: #495057;
+            color: var(--argus-text);
         }
         
         .feature-list li::before {
@@ -1942,8 +1949,8 @@ export function generateNavigationIndex(contracts: ContractInfo[]): string {
             
             <div class="contracts-list" id="contractsList">
                 ${contracts
-                  .map(
-                    (contract) => `
+      .map(
+        (contract) => `
                 <div class="contract-group" data-contract="${contract.name}">
                     <div class="contract-header" data-action="toggle-contract" data-contract="${contract.name}">
                         <span class="contract-toggle" id="toggle-${contract.name}">▶</span>
@@ -1951,29 +1958,28 @@ export function generateNavigationIndex(contracts: ContractInfo[]): string {
                         <span class="contract-stats">${contract.functions.length} functions</span>
                     </div>
                     <div class="functions-list" id="functions-${contract.name}">
-                        ${
-                          contract.hasAllFunctionsFile
-                            ? `
-                        <div class="all-functions-item" data-action="load-content" data-path="${contract.name}/${contract.name}_all_functions.html" data-title="All Functions - ${contract.name}">
-                            📊 All Functions
+                        ${contract.hasAllFunctionsFile
+            ? `
+            <div class="all-functions-item" data-action="load-content" data-path="${contract.name}/${contract.name}_all_functions.html" data-title="All Functions - ${contract.name}">
+                            � All Functions
                         </div>
                         `
-                            : ''
-                        }
+            : ''
+          }
                         ${contract.functions
-                          .map(
-                            (func) => `
+            .map(
+              (func) => `
                         <div class="function-item" data-action="load-content" data-path="${contract.name}/${func.filename}" data-title="${func.name} - ${contract.name}">
                             ${func.stateMutability === 'pure' || func.stateMutability === 'view' ? `👁️` : `🔧`} ${escapeHtml(func.name)}
                         </div>
                         `
-                          )
-                          .join('')}
+            )
+            .join('')}
                     </div>
                 </div>
                 `
-                  )
-                  .join('')}
+      )
+      .join('')}
             </div>
         </div>
         
