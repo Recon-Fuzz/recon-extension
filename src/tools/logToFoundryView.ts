@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import {
   echidnaLogsToFunctions,
   medusaLogsToFunctions,
-  halmosSequenceToFunction,
+  halmosLogsToFunctions,
   processLogs,
   Fuzzer,
   VmParsingData,
@@ -127,11 +127,11 @@ export class LogToFoundryViewProvider {
             vmData
           );
         } else if (fuzzer === "halmos") {
-          finalTrace = halmosSequenceToFunction(
+          finalTrace = halmosLogsToFunctions(
             prop.sequence,
-            prop.brokenProperty,
             index.toString(),
-            index
+            prop.brokenProperty,
+            vmData
           );
         } else {
           finalTrace = echidnaLogsToFunctions(
@@ -176,11 +176,11 @@ export class LogToFoundryViewProvider {
       if (fuzzer === "medusa") {
         finalTrace = medusaLogsToFunctions(trace, index.toString(), vmData);
       } else if (fuzzer === "halmos" || fuzzer === "Halmos") {
-        finalTrace = halmosSequenceToFunction(
+        finalTrace = halmosLogsToFunctions(
           trace,
-          brokenProperty,
           index.toString(),
-          index
+          brokenProperty,
+          vmData
         );
       } else {
         finalTrace = echidnaLogsToFunctions(

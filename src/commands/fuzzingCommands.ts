@@ -93,7 +93,7 @@ async function runFuzzer(
 
     command = `halmos --match-contract ${
       target || "CryticTester"
-    } --loop ${unroll} --solver-timeout-assertion 0 --solver ${solver}`;
+    } -vv --loop ${unroll} --solver-timeout-assertion 0 --solver ${solver}`;
   }
 
   // Create output channel for live feedback
