@@ -87,13 +87,13 @@ async function runFuzzer(
     }
   } else {
     const config = vscode.workspace.getConfiguration("recon.halmos");
-    const depth = config.get<number>("depth", 22);
-    const unroll = config.get<number>("unroll", 256);
-    const solver = config.get<string>("solver", "z3");
+    // TODO: Add these later
+    // const unroll = config.get<number>("unroll", 256);
+    // const solver = config.get<string>("solver", "z3");
 
     command = `halmos --match-contract ${
       target || "CryticTester"
-    } -vv --loop ${unroll} --solver-timeout-assertion 0 --solver ${solver}`;
+    } -vv --solver-timeout-assertion 0 `;
   }
 
   // Create output channel for live feedback

@@ -408,7 +408,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@recon-fuzz/log-parser": "^0.0.35",
+    "@recon-fuzz/log-parser": "^0.0.37",
     "@solidity-parser/parser": "^0.20.1",
     "@types/prismjs": "^1.26.5",
     "@vscode/codicons": "^0.0.39",
