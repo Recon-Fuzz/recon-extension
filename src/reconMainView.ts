@@ -372,7 +372,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     <vscode-button id="fuzz-btn" appearance="primary">
                         <span class="generate-btn-content">
                             <i class="codicon codicon-beaker"></i>
-                            Fuzz with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : defaultFuzzer === FuzzerTool.MEDUSA ? 'Medusa' : 'Halmos'}
+                            ${defaultFuzzer === FuzzerTool.HALMOS ? "Verify" : "Fuzz"} with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : defaultFuzzer === FuzzerTool.MEDUSA ? 'Medusa' : 'Halmos'}
                         </span>
                     </vscode-button>
                     <vscode-button id="settings-btn" appearance="secondary">
