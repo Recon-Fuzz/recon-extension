@@ -209,7 +209,7 @@ export class ChimeraGenerator {
         const remappings = currentRemappings
             .split('\n')
             .map(line => line.trim())
-            .filter(line => line && !line.startsWith('@chimera'));
+            .filter(line => line && !line.startsWith('@chimera') && !line.startsWith('@recon'));
 
         remappings.push(chimeraMapping);
         remappings.push(setupToolsMapping);

@@ -31,6 +31,7 @@ The Recon extension is a VS Code extension that streamlines smart contract testi
 - **Coverage visualization**: View and analyze code coverage from fuzzers
 - **Test generation**: Generate Foundry unit tests from call sequences that break properties found by the fuzzer
 - **Log to Foundry Repro converter**: Convert Echidna and Medusa logs to Foundry test reproductions with customizable VM options
+- **Link Libraries (Experimental)**: Automatically detect and configure library dependencies for Echidna and Medusa
 - **Mock/TargetFunctions generation**: Easily create mock contracts and target functions for testing
 - **CodeLens integration**: Run tests and modify function behaviors directly in the editor
 

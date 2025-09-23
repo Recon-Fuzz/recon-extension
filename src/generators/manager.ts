@@ -48,9 +48,9 @@ export class TemplateManager {
             const reconContent = await fs.readFile(reconPath, 'utf8');
             const reconConfig = JSON.parse(reconContent);
 
-            // Only process contracts that have configured functions
+            // Process all enabled contracts, including those with only view/pure functions
             for (const [jsonPath, config] of Object.entries(reconConfig)) {
-                if ((config as any).functions?.length > 0) {
+                if ((config as any).enabled === true) {
                     try {
                         const fullPath = path.join(this.workspaceRoot, jsonPath);
                         const content = await fs.readFile(fullPath, 'utf8');
