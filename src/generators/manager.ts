@@ -14,6 +14,7 @@ export class TemplateManager {
         const SKIP_IF_EXISTS = [
             'echidna.yaml',
             'medusa.json',
+            'halmos.toml',
             `${testFolder}/recon/BeforeAfter.sol`,
             `${testFolder}/recon/CryticTester.sol`,
             `${testFolder}/recon/CryticToFoundry.sol`,
@@ -207,6 +208,7 @@ export class TemplateManager {
         const files: Record<string, string> = {
             'echidna.yaml': templates.echidnaConfigTemplate({}),
             'medusa.json': templates.medusaConfigTemplate({}),
+            'halmos.toml': templates.halmosConfigTemplate({}),
             [`${testFolder}/recon/BeforeAfter.sol`]: templates.beforeAfterTemplate({}),
             [`${testFolder}/recon/CryticTester.sol`]: templates.cryticTesterTemplate({}),
             [`${testFolder}/recon/CryticToFoundry.sol`]: templates.cryticToFoundryTemplate({}),

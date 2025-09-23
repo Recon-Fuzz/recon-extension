@@ -12,8 +12,9 @@ export enum Mode {
 }
 
 export enum FuzzerTool {
-    ECHIDNA = 'echidna',
-    MEDUSA = 'medusa'
+    ECHIDNA = 'Echidna',
+    MEDUSA = 'Medusa',
+    HALMOS = 'Halmos'
 }
 
 export interface CoverageFile {
