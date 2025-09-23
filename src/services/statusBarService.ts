@@ -24,7 +24,7 @@ export class StatusBarService {
 
         this.halmosStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 18);
         this.halmosStatusBarItem.text = "$(microscope) Run Halmos";
-        this.halmosStatusBarItem.tooltip = "Run Halmos Fuzzer";
+        this.halmosStatusBarItem.tooltip = "Run Halmos";
         this.halmosStatusBarItem.command = 'recon.runHalmos';
         this.halmosStatusBarItem.color = new vscode.ThemeColor('charts.purple');
         this.halmosStatusBarItem.show();
