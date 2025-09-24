@@ -130,6 +130,11 @@
           "group": "2_workspace"
         },
         {
+          "command": "recon.previewArgusCallGraphHere",
+          "when": "resourceExtname == .sol",
+          "group": "2_workspace"
+        },
+        {
           "command": "recon.cleanupCoverageReport",
           "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/ || resourcePath =~ /halmos/)",
           "group": "2_workspace"
@@ -264,6 +269,12 @@
       },
       {
         "command": "recon.previewArgusCallGraph",
+        "title": "Preview Argus Call Graph",
+        "category": "Recon",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "recon.previewArgusCallGraphHere",
         "title": "Preview Argus Call Graph",
         "category": "Recon",
         "icon": "$(graph)"

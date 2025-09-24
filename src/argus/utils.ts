@@ -52,10 +52,9 @@ export function highLevelCallWithOptions(fnCall: FunctionCall, noStatic = false)
   if (
     !(fnCall.vExpression instanceof MemberAccess) ||
     !(fnCall.vExpression.vExpression instanceof MemberAccess)
-  )
-    return false;
+  ) { return false; }
   const ref = fnCall.vExpression?.vExpression.vReferencedDeclaration;
-  if (!(ref instanceof FunctionDefinition)) return false;
+  if (!(ref instanceof FunctionDefinition)) { return false; }
   if (noStatic) {
     if (
       ref.stateMutability === FunctionStateMutability.Pure ||
@@ -67,10 +66,10 @@ export function highLevelCallWithOptions(fnCall: FunctionCall, noStatic = false)
   }
 
   if (fnCall.vExpression.vExpression.vExpression.typeString.startsWith('type(library ')) {
-    if (!ref.vReturnParameters || ref.vReturnParameters?.vParameters.length === 0) return false;
+    if (!ref.vReturnParameters || ref.vReturnParameters?.vParameters.length === 0) { return false; }
     for (const inFnCall of ref.getChildrenByType(FunctionCall)) {
-      if (highLevelCall(inFnCall, noStatic)) return true;
-      if (highLevelCallWithOptions(inFnCall, noStatic)) return true;
+      if (highLevelCall(inFnCall, noStatic)) { return true; }
+      if (highLevelCallWithOptions(inFnCall, noStatic)) { return true; }
     }
   }
   return (
@@ -80,9 +79,9 @@ export function highLevelCallWithOptions(fnCall: FunctionCall, noStatic = false)
 }
 
 export function highLevelCall(fnCall: FunctionCall, noStatic = false): boolean {
-  if (!(fnCall.vExpression instanceof MemberAccess)) return false;
+  if (!(fnCall.vExpression instanceof MemberAccess)) { return false; }
   const ref = fnCall.vExpression.vReferencedDeclaration;
-  if (!(ref instanceof FunctionDefinition)) return false;
+  if (!(ref instanceof FunctionDefinition)) { return false; }
   if (noStatic) {
     if (
       ref.stateMutability === FunctionStateMutability.Pure ||
@@ -94,10 +93,10 @@ export function highLevelCall(fnCall: FunctionCall, noStatic = false): boolean {
   }
 
   if (fnCall.vExpression.vExpression.typeString.startsWith('type(library ')) {
-    if (!ref.vReturnParameters || ref.vReturnParameters?.vParameters.length === 0) return false;
+    if (!ref.vReturnParameters || ref.vReturnParameters?.vParameters.length === 0) { return false; }
     for (const inFnCall of ref.getChildrenByType(FunctionCall)) {
-      if (highLevelCall(inFnCall, noStatic)) return true;
-      if (highLevelCallWithOptions(inFnCall, noStatic)) return true;
+      if (highLevelCall(inFnCall, noStatic)) { return true; }
+      if (highLevelCallWithOptions(inFnCall, noStatic)) { return true; }
     }
   }
   return (
@@ -183,13 +182,13 @@ export function lowLevelTransfer(fnCall: FunctionCall): boolean {
 
 export function isStateVarAssignment(node: Assignment): boolean {
   const decl = getStateVarAssignment(node);
-  if (!decl) return false;
+  if (!decl) { return false; }
   return decl && (decl.stateVariable || decl.storageLocation === DataLocation.Storage);
 }
 
 export function getStateVarAssignment(node: Assignment): VariableDeclaration | null {
   const decl = getDeepRef(node.vLeftHandSide);
-  if (!(decl instanceof VariableDeclaration)) return null;
+  if (!(decl instanceof VariableDeclaration)) { return null; }
   return decl;
 }
 
@@ -864,6 +863,26 @@ ${indent}  </div>`;
             justify-content: space-around;
             text-align: center;
         }
+        /* Legend panel for color and count indicators */
+        .legend-panel {
+          border: 1px solid var(--argus-border);
+          border-radius: 6px;
+          padding: 12px 14px;
+          margin: 12px 0 20px;
+        }
+        .legend-title {
+          margin: 0 0 8px 0;
+          font-size: 12px;
+          letter-spacing: .02em;
+          color: var(--argus-text);
+          opacity: .8;
+          text-transform: uppercase;
+        }
+        .legend-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+        .legend-swatch { width: 16px; height: 12px; border-radius: 3px; border: 1px solid var(--argus-border); display: inline-block; }
+        .legend-red { background-color: #f8d7da; border-color: #f5c6cb; }
+        .legend-yellow { background-color: #fff3cd; border-color: #ffeaa7; }
+        .legend-text { font-size: 12px; color: var(--argus-text); }
         
         .stat-item {
             flex: 1;
@@ -1315,6 +1334,14 @@ ${indent}  </div>`;
         
         <div class="functions-container">
             ${allFunctionsHtml}
+        </div>
+
+        <div class="legend-panel" role="note" aria-label="Color legend for nodes and counters">
+          <h4 class="legend-title">Legend</h4>
+          <div class="legend-row"><span class="legend-swatch legend-red"></span><span class="legend-text">Red header = mutable external/public call</span></div>
+          <div class="legend-row"><span class="legend-swatch legend-yellow"></span><span class="legend-text">Yellow header = immutable (view/pure) external call</span></div>
+          <div class="legend-row"><span class="external-indicator red-indicator">2</span><span class="legend-text">Red circle = number of mutable external calls under this node (recursive)</span></div>
+          <div class="legend-row"><span class="external-indicator yellow-indicator">3</span><span class="legend-text">Yellow circle = number of immutable (view/pure) external calls under this node (recursive)</span></div>
         </div>
         
         ${slotsViewerHtml}
@@ -2103,13 +2130,12 @@ export function saveNavigationIndex(contracts: ContractInfo[], outDir: string = 
 }
 
 export const signatureEquals = (a: $.FunctionDefinition, b: $.FunctionDefinition) => {
-  if (!a.name || !b.name) return false;
-  if (a.name !== b.name) return false;
+  if (!a.name || !b.name) { return false; }
+  if (a.name !== b.name) { return false; }
   if (
     a.vParameters.vParameters.map((x) => x.type).join(',') !==
     b.vParameters.vParameters.map((x) => x.type).join(',')
-  )
-    return false;
-  if (a.visibility !== b.visibility) return false;
+  ) { return false; }
+  if (a.visibility !== b.visibility) { return false; }
   return a.stateMutability === b.stateMutability;
 };

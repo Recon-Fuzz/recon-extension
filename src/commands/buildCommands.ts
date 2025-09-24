@@ -29,7 +29,8 @@ export function registerBuildCommands(
             outputChannel.clear();
             outputChannel.appendLine('Starting Forge build...');
 
-            vscode.window.withProgress({
+            // Return the progress promise so callers can await build completion
+            return vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: "Building Foundry Project",
                 cancellable: true
@@ -103,7 +104,8 @@ export function registerBuildCommands(
             outputChannel.appendLine('Starting Forge build (with build-info)...');
 
             const baseCmd = 'forge build --build-info --skip test --skip tests --skip script --skip scripts';
-            vscode.window.withProgress({
+            // Return the progress promise so callers (e.g., Argus webview) can await completion
+            return vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Building Foundry Project (build-info)',
                 cancellable: true

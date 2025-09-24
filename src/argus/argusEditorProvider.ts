@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import { generateCallGraph } from './generateCallGraph';
 
 interface ArgusSettings {
-    includeAll: boolean; // formerly --all
-    includeDeps: boolean; // formerly --libs
+  includeAll: boolean; // formerly --all
+  includeDeps: boolean; // formerly --libs
 }
 
 /**
@@ -12,14 +12,14 @@ interface ArgusSettings {
  * Later we will integrate the real processing pipeline from processor.ts (processCompilerOutput) adapted for single-file focus.
  */
 export class ArgusCallGraphEditorProvider implements vscode.CustomTextEditorProvider {
-    public static readonly viewType = 'recon.argusCallGraph';
+  public static readonly viewType = 'recon.argusCallGraph';
 
-    constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) { }
 
-    async resolveCustomTextEditor(document: vscode.TextDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
-        webviewPanel.webview.options = {
-            enableScripts: true,
-        };
+  async resolveCustomTextEditor(document: vscode.TextDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
+    webviewPanel.webview.options = {
+      enableScripts: true,
+    };
 
     const settings: ArgusSettings = { includeAll: false, includeDeps: false };
     let genToken = 0;
@@ -33,39 +33,42 @@ export class ArgusCallGraphEditorProvider implements vscode.CustomTextEditorProv
         includeAll: settings.includeAll,
         includeDeps: settings.includeDeps
       });
-      if (token !== genToken) return; // stale generation
+      if (token !== genToken) { return; } // stale generation
       lastPrimaryContract = result.primaryContractName || lastPrimaryContract;
-  webviewPanel.webview.html = this.getHtml(webviewPanel.webview, document, settings, result.html);
+      webviewPanel.webview.html = this.getHtml(webviewPanel.webview, document, settings, result.html);
     };
     const scheduleUpdate = debounce(updateWebview, 300);
 
-        // Listen for document changes to refresh preview (future: incremental regen)
-        const changeSub = vscode.workspace.onDidChangeTextDocument(e => {
-            if (e.document.uri.toString() === document.uri.toString()) {
+    // Listen for document changes to refresh preview (future: incremental regen)
+    const changeSub = vscode.workspace.onDidChangeTextDocument(e => {
+      if (e.document.uri.toString() === document.uri.toString()) {
         scheduleUpdate();
-            }
-        });
-        webviewPanel.onDidDispose(() => changeSub.dispose());
+      }
+    });
+    webviewPanel.onDidDispose(() => changeSub.dispose());
 
-        // Handle messages from the webview
-        webviewPanel.webview.onDidReceiveMessage(msg => {
-            switch (msg.type) {
-                case 'updateSetting':
-                    if (msg.key in settings) {
+    // Handle messages from the webview
+    webviewPanel.webview.onDidReceiveMessage(msg => {
+      switch (msg.type) {
+        case 'updateSetting':
+          if (msg.key in settings) {
             (settings as any)[msg.key] = !!msg.value;
             scheduleUpdate();
-                    }
-                    break;
+          }
+          break;
         case 'runBuild':
           // Show interim building message
           webviewPanel.webview.postMessage?.({}); // no-op safeguard
-          webviewPanel.webview.html = `<div style="font-family:var(--vscode-font-family);padding:16px;">`+
-            `<strong>Building project (forge build --build-info)...</strong><br/><br/>`+
-            `Open the <em>Recon</em> output channel to watch progress. The call graph will refresh automatically when done.`+
+          webviewPanel.webview.html = `<div style="font-family:var(--vscode-font-family);padding:16px;">` +
+            `<strong>Building project (forge build --build-info)...</strong><br/><br/>` +
+            `Open the <em>Recon</em> output channel to watch progress. The call graph will refresh automatically when done.` +
             `</div>`;
-          vscode.commands.executeCommand('recon.buildWithInfo').then(() => {
-            scheduleUpdate();
-          });
+          // Await the build command; our command now returns a promise that resolves when build finishes
+          Promise.resolve(vscode.commands.executeCommand('recon.buildWithInfo'))
+            .finally(() => {
+              // Refresh regardless of success/failure/cancel so the page doesn't get stuck
+              scheduleUpdate();
+            });
           break;
         case 'copyToClipboard':
           if (typeof msg.text === 'string' && msg.text.length > 0) {
@@ -95,17 +98,17 @@ export class ArgusCallGraphEditorProvider implements vscode.CustomTextEditorProv
                 : pathMod.dirname(document.uri.fsPath);
               const baseDirUri = vscode.Uri.file(baseDirFs);
               const inferredName = lastPrimaryContract ? `${lastPrimaryContract}-callgraph.png` : 'callgraph.png';
-              const fileBase = (suggested || inferredName).replace(/[^a-z0-9_.-]/gi,'_');
+              const fileBase = (suggested || inferredName).replace(/[^a-z0-9_.-]/gi, '_');
               let targetName = fileBase;
               let attempt = 0;
               while (attempt < 50) {
                 const candidate = pathMod.join(baseDirFs, targetName);
-                console.log('[Argus] exportImage attempt', attempt+1, 'candidate', candidate);
+                console.log('[Argus] exportImage attempt', attempt + 1, 'candidate', candidate);
                 if (!fs.existsSync(candidate)) {
                   const uri = vscode.Uri.file(candidate);
                   await vscode.workspace.fs.writeFile(uri, buffer);
                   const rel = workspaceRoot ? pathMod.relative(workspaceRoot, uri.fsPath) : uri.fsPath;
-                  vscode.window.showInformationMessage(`Argus call graph image saved at workspace root: ${rel}` , 'Open').then(sel => {
+                  vscode.window.showInformationMessage(`Argus call graph image saved at workspace root: ${rel}`, 'Open').then(sel => {
                     if (sel === 'Open') { vscode.commands.executeCommand('vscode.open', uri); }
                   });
                   webviewPanel.webview.postMessage({ type: 'exportImageResult', ok: true, file: uri.fsPath });
@@ -113,7 +116,7 @@ export class ArgusCallGraphEditorProvider implements vscode.CustomTextEditorProv
                   return;
                 }
                 attempt++;
-                const stem = fileBase.replace(/\.png$/i,'');
+                const stem = fileBase.replace(/\.png$/i, '');
                 targetName = `${stem}-${attempt}.png`;
               }
               vscode.window.showWarningMessage('Unable to save image: too many existing versions.');
@@ -127,44 +130,44 @@ export class ArgusCallGraphEditorProvider implements vscode.CustomTextEditorProv
           })();
           break;
         }
-            }
-        });
+      }
+    });
 
     updateWebview();
-    }
+  }
   private getLoadingHtml(document: vscode.TextDocument, _settings: ArgusSettings): string {
     const fileName = vscode.workspace.asRelativePath(document.uri);
     return `<div style="font-family:var(--vscode-font-family);padding:16px;">Generating Argus Call Graph for <code>${escapeHtml(vscode.workspace.asRelativePath(document.uri))}</code>...</div>`;
   }
 
   private getHtml(webview: vscode.Webview, document: vscode.TextDocument, settings: ArgusSettings, body: string): string {
-        const nonce = getNonce();
-        const fileName = vscode.workspace.asRelativePath(document.uri);
-    const html2canvasUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules','html2canvas','dist','html2canvas.min.js'));
+    const nonce = getNonce();
+    const fileName = vscode.workspace.asRelativePath(document.uri);
+    const html2canvasUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules', 'html2canvas', 'dist', 'html2canvas.min.js'));
     // Extract inner <body> content if a full HTML document was returned to avoid nested <html> issues
-  let fragment = body;
-  const bodyMatch = body.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (bodyMatch) fragment = bodyMatch[1];
-  // Collect any style tags from original HTML (head or body) to preserve design
-  const styleTags: string[] = [];
-  const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
-  let m: RegExpExecArray | null;
-  while((m = styleRegex.exec(body))){ styleTags.push(m[0]); }
-  const collectedStyles = styleTags.join('\n');
+    let fragment = body;
+    const bodyMatch = body.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) { fragment = bodyMatch[1]; }
+    // Collect any style tags from original HTML (head or body) to preserve design
+    const styleTags: string[] = [];
+    const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = styleRegex.exec(body))) { styleTags.push(m[0]); }
+    const collectedStyles = styleTags.join('\n');
     // Ensure any <script> tags inside the fragment receive the nonce so CSP allows execution
-        const bodyWithNonce = fragment
-          .replace(/<script(?![^>]*nonce=)/g, `<script nonce="${nonce}"`)
-          .replace(/<style(?![^>]*nonce=)/g, `<style nonce="${nonce}"`);
+    const bodyWithNonce = fragment
+      .replace(/<script(?![^>]*nonce=)/g, `<script nonce="${nonce}"`)
+      .replace(/<style(?![^>]*nonce=)/g, `<style nonce="${nonce}"`);
 
     // Prism resource URIs (mirror working implementation in logToFoundryView)
-        const prismCore = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules','prismjs','prism.js'));
-        const prismSolidity = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules','prismjs','components','prism-solidity.min.js'));
-        const prismTheme = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules','prismjs','themes','prism-tomorrow.css'));
-        return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+    const prismCore = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules', 'prismjs', 'prism.js'));
+    const prismSolidity = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules', 'prismjs', 'components', 'prism-solidity.min.js'));
+    const prismTheme = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'node_modules', 'prismjs', 'themes', 'prism-tomorrow.css'));
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline' ${this.getCspSource()}; script-src 'nonce-${nonce}' ${this.getCspSource()};" />
 <title>Argus Call Graph Preview</title>
 <link rel="stylesheet" href="${prismTheme}" />
-${collectedStyles.replace(/<style/gi, `<style nonce="${nonce}"`).replace(/<script/gi,'<!-- stripped-script')}
+${collectedStyles.replace(/<style/gi, `<style nonce="${nonce}"`).replace(/<script/gi, '<!-- stripped-script')}
 <style nonce="${nonce}">
 /* Header layout & logo (inline) */
 header.argus-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
@@ -356,30 +359,30 @@ window.addEventListener('message', function(event){
   else { btn.innerHTML='❌ Save Failed'; setTimeout(function(){ btn.innerHTML='📷 Export as Image'; btn.disabled=false; }, 2200); }
 });
 </script></body></html>`;
-    }
+  }
 
-    private getCspSource(): string {
-        return this.context.extensionUri.scheme === 'vscode-file' ? 'vscode-file:' : 'vscode-resource:';
-    }
+  private getCspSource(): string {
+    return this.context.extensionUri.scheme === 'vscode-file' ? 'vscode-file:' : 'vscode-resource:';
+  }
 }
 
 function escapeHtml(str: string): string {
-    return str.replace(/[&<>'"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s] as string));
+  return str.replace(/[&<>'"]/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[s] as string));
 }
 
 function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }
 
 function debounce<T extends (...args: any[]) => unknown>(fn: T, wait: number) {
   let handle: NodeJS.Timeout | undefined;
   return (...args: Parameters<T>) => {
-    if (handle) clearTimeout(handle);
+    if (handle) { clearTimeout(handle); }
     handle = setTimeout(() => fn(...args), wait);
   };
 }

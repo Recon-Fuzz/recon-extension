@@ -11,7 +11,7 @@ import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
 
-export async function activate(context: vscode.ExtensionContext) {   
+export async function activate(context: vscode.ExtensionContext) {
     // Create services
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
@@ -72,24 +72,50 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Command to open current Solidity file with Argus preview
     context.subscriptions.push(
-        vscode.commands.registerCommand('recon.previewArgusCallGraph', async () => {
-            const active = vscode.window.activeTextEditor;
-            if (!active || active.document.languageId !== 'solidity') {
-                vscode.window.showInformationMessage('Open a Solidity (.sol) file first.');
+        // Editor/Palette: always open beside
+        vscode.commands.registerCommand('recon.previewArgusCallGraph', async (resource?: vscode.Uri) => {
+            let target: vscode.Uri | undefined = undefined;
+            if (resource && resource instanceof vscode.Uri) {
+                target = resource;
+            } else {
+                const active = vscode.window.activeTextEditor;
+                if (active && active.document.languageId === 'solidity') {
+                    target = active.document.uri;
+                }
+            }
+            if (!target) {
+                vscode.window.showInformationMessage('Select or open a Solidity (.sol) file to preview Argus.');
                 return;
             }
-            // Open Argus preview to the side (similar to Markdown preview behavior)
             await vscode.commands.executeCommand(
                 'vscode.openWith',
-                active.document.uri,
+                target,
                 ArgusCallGraphEditorProvider.viewType,
-                {
-                    viewColumn: vscode.ViewColumn.Beside,
-                    preserveFocus: true
+                { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }
+            );
+        }),
+        // Explorer: open in current group (full width)
+        vscode.commands.registerCommand('recon.previewArgusCallGraphHere', async (resource?: vscode.Uri) => {
+            let target: vscode.Uri | undefined = undefined;
+            if (resource && resource instanceof vscode.Uri) {
+                target = resource;
+            } else {
+                const active = vscode.window.activeTextEditor;
+                if (active && active.document.languageId === 'solidity') {
+                    target = active.document.uri;
                 }
+            }
+            if (!target) {
+                vscode.window.showInformationMessage('Select a Solidity (.sol) file in the Explorer to open Argus.');
+                return;
+            }
+            await vscode.commands.executeCommand(
+                'vscode.openWith',
+                target,
+                ArgusCallGraphEditorProvider.viewType
             );
         })
     );
 }
 
-export function deactivate() {}
+export function deactivate() { }
