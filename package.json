@@ -121,17 +121,17 @@
       "explorer/context": [
         {
           "command": "recon.generateMock",
-          "when": "resourceExtname == .json || resourceExtname == .sol",
+          "when": "resourceExtname == .json || resourceExtname == .sol || resourceExtname == .vy",
           "group": "2_workspace"
         },
         {
           "command": "recon.generateTargetFunctions",
-          "when": "resourceExtname == .json || resourceExtname == .sol",
+          "when": "resourceExtname == .json || resourceExtname == .sol || resourceExtname == .vy",
           "group": "2_workspace"
         },
         {
           "command": "recon.cleanupCoverageReport",
-          "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/)",
+          "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/ || resourcePath =~ /halmos/)",
           "group": "2_workspace"
         }
       ],
@@ -208,6 +208,11 @@
         "category": "Recon"
       },
       {
+        "command": "recon.runHalmos",
+        "title": "Run Halmos",
+        "category": "Recon"
+      },
+      {
         "command": "recon.runTest",
         "title": "Run Solidity Test",
         "category": "Recon"
@@ -279,7 +284,8 @@
           "scope": "resource",
           "enum": [
             "Echidna",
-            "Medusa"
+            "Medusa",
+            "Halmos"
           ],
           "description": "Default fuzzing tool to use",
           "order": 1
@@ -337,19 +343,48 @@
           "order": 7,
           "description": "Number of workers for Medusa fuzzing"
         },
+        "recon.halmos.depth": {
+          "type": "number",
+          "default": 22,
+          "minimum": 1,
+          "scope": "resource",
+          "order": 8,
+          "description": "Maximum call depth for Halmos symbolic execution"
+        },
+        "recon.halmos.unroll": {
+          "type": "number",
+          "default": 256,
+          "minimum": 1,
+          "scope": "resource",
+          "order": 9,
+          "description": "Maximum loop unrolling factor for Halmos"
+        },
+        "recon.halmos.solver": {
+          "type": "string",
+          "default": "z3",
+          "scope": "resource",
+          "enum": [
+            "z3",
+            "cvc5",
+            "bitwuzla",
+            "yices"
+          ],
+          "order": 10,
+          "description": "SMT solver to use for Halmos symbolic execution"
+        },
         "recon.foundryConfigPath": {
           "type": "string",
           "default": "foundry.toml",
           "description": "Path to foundry.toml configuration file (relative to workspace root)",
           "scope": "resource",
-          "order": 8
+          "order": 11
         },
         "recon.forge.buildArgs": {
           "type": "string",
           "default": "",
           "description": "Extra arguments to pass to forge build command (e.g. --via-ir)",
           "scope": "resource",
-          "order": 1
+          "order": 12
         },
         "recon.forge.testVerbosity": {
           "type": "string",
@@ -363,28 +398,28 @@
           ],
           "description": "Verbosity level for forge test command",
           "scope": "resource",
-          "order": 2
+          "order": 13
         },
         "recon.mocksFolderPath": {
           "type": "string",
           "default": "test/recon/mocks",
           "description": "Path to store generated mock contracts (relative to foundry.toml location)",
           "scope": "resource",
-          "order": 11
+          "order": 14
         },
         "recon.mockAutoSave": {
           "type": "boolean",
           "default": true,
           "description": "Automatically save generated mock contracts to disk",
           "scope": "resource",
-          "order": 12
+          "order": 15
         },
         "recon.customTestFolderPath": {
           "type": "string",
           "default": "",
           "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
           "scope": "resource",
-          "order": 13
+          "order": 16
         }
       }
     }
@@ -412,7 +447,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@recon-fuzz/log-parser": "^0.0.32",
+    "@recon-fuzz/log-parser": "^0.0.37",
     "@solidity-parser/parser": "^0.20.1",
     "@types/prismjs": "^1.26.5",
     "@vscode/codicons": "^0.0.39",

@@ -1,4 +1,4 @@
-import { echidnaLogsToFunctions, Fuzzer, medusaLogsToFunctions } from '@recon-fuzz/log-parser';
+import { echidnaLogsToFunctions, Fuzzer, halmosLogsToFunctions, medusaLogsToFunctions } from '@recon-fuzz/log-parser';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -37,7 +37,7 @@ export async function findSrcDirectory(workspaceRoot: string): Promise<void> {
         if (match) {
             srcDirectory = match[1];
         }
-    } catch {}
+    } catch { }
 }
 
 
@@ -97,9 +97,10 @@ export const prepareTrace = (fuzzer: Fuzzer, prefix: string, trace: string, brok
     let finalTrace = "";
     if (fuzzer === Fuzzer.MEDUSA) {
         finalTrace = medusaLogsToFunctions(trace, prefix, vmData);
-    }
-    else if (fuzzer === Fuzzer.ECHIDNA) {
+    } else if (fuzzer === Fuzzer.ECHIDNA) {
         finalTrace = echidnaLogsToFunctions(trace, prefix, brokenProperty, vmData);
+    } else if (fuzzer === Fuzzer.HALMOS) {
+        finalTrace = halmosLogsToFunctions(trace, prefix, brokenProperty, vmData);
     }
     const functionName = finalTrace
         .split("() public")[0]

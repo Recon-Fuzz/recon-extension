@@ -1,189 +1,250 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 import {
   echidnaLogsToFunctions,
   medusaLogsToFunctions,
+  halmosLogsToFunctions,
   processLogs,
   Fuzzer,
   VmParsingData,
-  FuzzingResults
+  FuzzingResults,
 } from "@recon-fuzz/log-parser";
 
 interface VmOptions {
-    prank: boolean;
-    roll: boolean;
-    warp: boolean;
+  prank: boolean;
+  roll: boolean;
+  warp: boolean;
 }
 
 export class LogToFoundryViewProvider {
-    public static readonly viewType = 'recon.logToFoundry';
+  public static readonly viewType = "recon.logToFoundry";
 
-    constructor(
-        private readonly _extensionUri: vscode.Uri,
-    ) {}
+  constructor(private readonly _extensionUri: vscode.Uri) {}
 
-    public createWebviewPanel(): vscode.WebviewPanel {
-        const panel = vscode.window.createWebviewPanel(
-            LogToFoundryViewProvider.viewType,
-            'Log to Foundry',
-            vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                localResourceRoots: [this._extensionUri]
-            }
-        );
+  public createWebviewPanel(): vscode.WebviewPanel {
+    const panel = vscode.window.createWebviewPanel(
+      LogToFoundryViewProvider.viewType,
+      "Log to Foundry",
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        localResourceRoots: [this._extensionUri],
+      }
+    );
 
-        panel.webview.onDidReceiveMessage(
-            async message => {
-                switch (message.type) {
-                    case 'convert':
-                        try {
-                            const results = this.convertLog(message.log, message.vmOptions, message.fuzzer);
-                            await panel.webview.postMessage({ type: 'conversionResult', results });
-                        } catch (error) {
-                            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                            vscode.window.showErrorMessage(`Error converting log: ${errorMessage}`);
-                        }
-                        break;
-                    case 'regenerate':
-                        try {
-                            const code = this.regenerateCode(message.trace, message.brokenProperty, message.vmData, message.fuzzer, message.index);
-                            await panel.webview.postMessage({ type: 'regenerateResult', code, index: message.index });
-                        } catch (error) {
-                            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                            vscode.window.showErrorMessage(`Error regenerating code: ${errorMessage}`);
-                        }
-                        break;
-                    case 'copy':
-                        vscode.env.clipboard.writeText(message.text);
-                        break;
-                }
-            }
-        );
-
-        panel.webview.html = this._getHtmlForWebview(panel.webview);
-        return panel;
-    }
-
-    private convertLog(log: string, vmOptions: VmOptions, fuzzer: string): any {
-        if (!log.trim()) {
-            return { brokenProperties: [], traces: [], generatedCode: [] };
-        }
-
-        try {
-            // Process logs using recon-fuzz/log-parser
-            const jobStats: FuzzingResults = processLogs(log, fuzzer.toUpperCase() as unknown as Fuzzer);
-
-            if (!jobStats.brokenProperties || jobStats.brokenProperties.length === 0) {
-                return { brokenProperties: [], traces: [], generatedCode: [] };
-            }
-
-            // Extract traces and prepare VM data for each property
-            const traces = jobStats.brokenProperties.map(prop => prop.sequence);
-            const useVmData = jobStats.brokenProperties.map(() => ({
-                roll: true,
-                time: true,
-                prank: true
-            }));
-
-            // Generate code for each broken property using the actual functions
-            const generatedCode = jobStats.brokenProperties.map((prop, index) => {
-                const vmData: VmParsingData = {
-                    roll: true,
-                    time: true,
-                    prank: true
-                };
-
-                let finalTrace = "";
-                if (fuzzer === 'medusa') {
-                    finalTrace = medusaLogsToFunctions(
-                        prop.sequence,
-                        index.toString(),
-                        vmData
-                    );
-                } else {
-                    finalTrace = echidnaLogsToFunctions(
-                        prop.sequence,
-                        index.toString(),
-                        prop.brokenProperty,
-                        vmData
-                    );
-                }
-                
-                const functionName = finalTrace
-                    .split("() public")[0]
-                    .replace("function ", "");
-                const forgeCommand = `// forge test --match-test ${functionName} -vvv`.replace("\n", "");
-                
-                return `${forgeCommand}\n${finalTrace}`;
+    panel.webview.onDidReceiveMessage(async (message) => {
+      switch (message.type) {
+        case "convert":
+          try {
+            const results = this.convertLog(
+              message.log,
+              message.vmOptions,
+              message.fuzzer
+            );
+            await panel.webview.postMessage({
+              type: "conversionResult",
+              results,
             });
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error occurred";
+            vscode.window.showErrorMessage(
+              `Error converting log: ${errorMessage}`
+            );
+          }
+          break;
+        case "regenerate":
+          try {
+            const code = this.regenerateCode(
+              message.trace,
+              message.brokenProperty,
+              message.vmData,
+              message.fuzzer,
+              message.index
+            );
+            await panel.webview.postMessage({
+              type: "regenerateResult",
+              code,
+              index: message.index,
+            });
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error occurred";
+            vscode.window.showErrorMessage(
+              `Error regenerating code: ${errorMessage}`
+            );
+          }
+          break;
+        case "copy":
+          vscode.env.clipboard.writeText(message.text);
+          break;
+      }
+    });
 
-            return {
-                brokenProperties: jobStats.brokenProperties,
-                traces,
-                useVmData,
-                generatedCode,
-                fuzzer
-            };
-        } catch (error) {
-            console.error('Error converting log:', error);
-            throw error;
+    panel.webview.html = this._getHtmlForWebview(panel.webview);
+    return panel;
+  }
+
+  private convertLog(log: string, vmOptions: VmOptions, fuzzer: string): any {
+    if (!log.trim()) {
+      return { brokenProperties: [], traces: [], generatedCode: [] };
+    }
+
+    try {
+      // Process logs using recon-fuzz/log-parser
+      const jobStats: FuzzingResults = processLogs(
+        log,
+        fuzzer.toUpperCase() as unknown as Fuzzer
+      );
+
+      if (
+        !jobStats.brokenProperties ||
+        jobStats.brokenProperties.length === 0
+      ) {
+        return { brokenProperties: [], traces: [], generatedCode: [] };
+      }
+
+      // Extract traces and prepare VM data for each property
+      const traces = jobStats.brokenProperties.map((prop) => prop.sequence);
+      const useVmData = jobStats.brokenProperties.map(() => ({
+        roll: true,
+        time: true,
+        prank: true,
+      }));
+
+      // Generate code for each broken property using the actual functions
+      const generatedCode = jobStats.brokenProperties.map((prop, index) => {
+        const vmData: VmParsingData = {
+          roll: true,
+          time: true,
+          prank: true,
+        };
+
+        let finalTrace = "";
+        if (fuzzer === "medusa") {
+          finalTrace = medusaLogsToFunctions(
+            prop.sequence,
+            index.toString(),
+            vmData
+          );
+        } else if (fuzzer === "halmos") {
+          finalTrace = halmosLogsToFunctions(
+            prop.sequence,
+            index.toString(),
+            prop.brokenProperty,
+            vmData
+          );
+        } else {
+          finalTrace = echidnaLogsToFunctions(
+            prop.sequence,
+            index.toString(),
+            prop.brokenProperty,
+            vmData
+          );
         }
-    }
 
-    private regenerateCode(trace: string, brokenProperty: string, vmData: VmParsingData, fuzzer: string, index: number): string {
-        try {
-            let finalTrace = "";
-            if (fuzzer === 'medusa') {
-                finalTrace = medusaLogsToFunctions(
-                    trace,
-                    index.toString(),
-                    vmData
-                );
-            } else {
-                finalTrace = echidnaLogsToFunctions(
-                    trace,
-                    index.toString(),
-                    brokenProperty,
-                    vmData
-                );
-            }
-            
-            const functionName = finalTrace
-                .split("() public")[0]
-                .replace("function ", "");
-            const forgeCommand = `// forge test --match-test ${functionName} -vvv`.replace("\n", "");
-            
-            return `${forgeCommand}\n${finalTrace}`;
-        } catch (error) {
-            console.error('Error regenerating code:', error);
-            throw error;
-        }
-    }
+        const functionName = finalTrace
+          .split("() public")[0]
+          .replace("function ", "");
+        const forgeCommand =
+          `// forge test --match-test ${functionName} -vvv`.replace("\n", "");
 
-    private getPrismThemeUri(webview: vscode.Webview): vscode.Uri {
-        return webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', 'prismjs', 'themes', 'prism-tomorrow.css')
+        return `${forgeCommand}\n${finalTrace}`;
+      });
+
+      return {
+        brokenProperties: jobStats.brokenProperties,
+        traces,
+        useVmData,
+        generatedCode,
+        fuzzer,
+      };
+    } catch (error) {
+      console.error("Error converting log:", error);
+      throw error;
+    }
+  }
+
+  private regenerateCode(
+    trace: string,
+    brokenProperty: string,
+    vmData: VmParsingData,
+    fuzzer: string,
+    index: number
+  ): string {
+    try {
+      let finalTrace = "";
+      if (fuzzer === "medusa") {
+        finalTrace = medusaLogsToFunctions(trace, index.toString(), vmData);
+      } else if (fuzzer === "halmos" || fuzzer === "Halmos") {
+        finalTrace = halmosLogsToFunctions(
+          trace,
+          index.toString(),
+          brokenProperty,
+          vmData
         );
-    }
-
-    private getPrismScriptUri(webview: vscode.Webview): vscode.Uri {
-        return webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', 'prismjs', 'prism.js')
+      } else {
+        finalTrace = echidnaLogsToFunctions(
+          trace,
+          index.toString(),
+          brokenProperty,
+          vmData
         );
+      }
+
+      const functionName = finalTrace
+        .split("() public")[0]
+        .replace("function ", "");
+      const forgeCommand =
+        `// forge test --match-test ${functionName} -vvv`.replace("\n", "");
+
+      return `${forgeCommand}\n${finalTrace}`;
+    } catch (error) {
+      console.error("Error regenerating code:", error);
+      throw error;
     }
+  }
 
-    private getPrismSolidityUri(webview: vscode.Webview): vscode.Uri {
-        return webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', 'prismjs', 'components', 'prism-solidity.min.js')
-        );
-    }
+  private getPrismThemeUri(webview: vscode.Webview): vscode.Uri {
+    return webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "node_modules",
+        "prismjs",
+        "themes",
+        "prism-tomorrow.css"
+      )
+    );
+  }
 
-    private _getHtmlForWebview(webview: vscode.Webview): string {
-        const prismThemeUri = this.getPrismThemeUri(webview);
-        const prismScriptUri = this.getPrismScriptUri(webview);
-        const prismSolidityUri = this.getPrismSolidityUri(webview);
+  private getPrismScriptUri(webview: vscode.Webview): vscode.Uri {
+    return webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "node_modules",
+        "prismjs",
+        "prism.js"
+      )
+    );
+  }
 
-        return `<!DOCTYPE html>
+  private getPrismSolidityUri(webview: vscode.Webview): vscode.Uri {
+    return webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "node_modules",
+        "prismjs",
+        "components",
+        "prism-solidity.min.js"
+      )
+    );
+  }
+
+  private _getHtmlForWebview(webview: vscode.Webview): string {
+    const prismThemeUri = this.getPrismThemeUri(webview);
+    const prismScriptUri = this.getPrismScriptUri(webview);
+    const prismSolidityUri = this.getPrismSolidityUri(webview);
+
+    return `<!DOCTYPE html>
         <html lang="en">
             <head>
                 <meta charset="UTF-8">
@@ -444,6 +505,9 @@ export class LogToFoundryViewProvider {
                         <label>
                             <input type="radio" name="fuzzer" value="medusa"> Medusa
                         </label>
+                        <label>
+                            <input type="radio" name="fuzzer" value="halmos"> Halmos
+                        </label>
                     </div>
                     
                     <textarea id="log-input" class="log-input" placeholder="Paste your fuzzer log here..."></textarea>
@@ -685,5 +749,5 @@ export class LogToFoundryViewProvider {
                 </script>
             </body>
         </html>`;
-    }
+  }
 }

@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import { getFoundryConfigPath } from './utils';
 import { EchidnaMode, FuzzerTool } from './types';
 
@@ -44,6 +43,9 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                 case 'updateMedusaWorkers':
                     await vscode.workspace.getConfiguration('recon').update('medusa.workers', message.value, vscode.ConfigurationTarget.Workspace);
                     break;
+                case 'updateHalmosLoop':
+                    await vscode.workspace.getConfiguration('recon').update('halmos.loop', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
                 case 'openSettings':
                     vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:Recon-Fuzz.recon');
                     break;
@@ -55,8 +57,10 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     const defaultFuzzer = vscode.workspace.getConfiguration('recon').get<string>('defaultFuzzer', FuzzerTool.ECHIDNA);
                     if (defaultFuzzer === FuzzerTool.ECHIDNA) {
                         vscode.commands.executeCommand('recon.runEchidna', message.value);
-                    } else {
+                    } else if (defaultFuzzer === FuzzerTool.MEDUSA) {
                         vscode.commands.executeCommand('recon.runMedusa', message.value);
+                    } else if (defaultFuzzer === FuzzerTool.HALMOS) {
+                        vscode.commands.executeCommand('recon.runHalmos', message.value);
                     }
                     break;
             }
@@ -297,6 +301,16 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         }
                     });
 
+                    document.getElementById('halmos-loop')?.addEventListener('change', (e) => {
+                        const value = parseInt(e.target.value, 10);
+                        if (!isNaN(value) && value >= 0) {
+                            vscode.postMessage({
+                                type: 'updateHalmosLoop',
+                                value: value
+                            });
+                        }
+                    });
+
                     // Update settings visibility based on fuzzer selection
                     document.getElementById('fuzzer-selection')?.addEventListener('change', (e) => {
                         const echidnaSettings = document.getElementById('echidna-settings');
@@ -304,9 +318,12 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         if (e.target.value === '${FuzzerTool.ECHIDNA}') {
                             echidnaSettings.style.display = '';
                             medusaSettings.style.display = 'none';
-                        } else {
+                        } else if (e.target.value === '${FuzzerTool.MEDUSA}') {
                             echidnaSettings.style.display = 'none';
                             medusaSettings.style.display = '';
+                        } else if (e.target.value === '${FuzzerTool.HALMOS}') {
+                            echidnaSettings.style.display = 'none';
+                            medusaSettings.style.display = 'none';
                         }
                         vscode.postMessage({
                             type: 'updateDefaultFuzzer',
@@ -347,6 +364,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
         const echidnaWorkers = config.get('echidna.workers', 1);
         const medusaTestLimit = config.get('medusa.testLimit', 1000000);
         const medusaWorkers = config.get('medusa.workers', 1);
+        const halmosLoop = config.get('halmos.loop', 10);
 
         return `
             <div class="button-container">
@@ -354,7 +372,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     <vscode-button id="fuzz-btn" appearance="primary">
                         <span class="generate-btn-content">
                             <i class="codicon codicon-beaker"></i>
-                            Fuzz with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : 'Medusa'}
+                            ${defaultFuzzer === FuzzerTool.HALMOS ? "Verify" : "Fuzz"} with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : defaultFuzzer === FuzzerTool.MEDUSA ? 'Medusa' : 'Halmos'}
                         </span>
                     </vscode-button>
                     <vscode-button id="settings-btn" appearance="secondary">
@@ -368,6 +386,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     <vscode-radio-group id="fuzzer-selection" value="${defaultFuzzer}">
                         <vscode-radio value="${FuzzerTool.ECHIDNA}">Echidna</vscode-radio>
                         <vscode-radio value="${FuzzerTool.MEDUSA}">Medusa</vscode-radio>
+                        <vscode-radio value="${FuzzerTool.HALMOS}">Halmos</vscode-radio>
                     </vscode-radio-group>
                 </div>
 
@@ -422,13 +441,25 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         ></vscode-text-field>
                     </div>
                 </div>
-                <div class="setting-group" style="margin-top:12px;">
-                    <label>Target:</label>
-                    <vscode-text-field
-                        id="target-contract"
-                        value="CryticTester"
-                    ></vscode-text-field>
+                <div class="settings-container" ${defaultFuzzer !== FuzzerTool.HALMOS ? 'style="display: none;"' : ''} id="halmos-settings">
+                    <div class="setting-group" style="margin-top:12px;">
+                        <label>Target:</label>
+                        <vscode-text-field
+                            id="target-contract"
+                            value="CryticTester"
+                        ></vscode-text-field>
+                    </div>
+                    <div class="setting-group">
+                        <label>Loop:</label>
+                        <vscode-text-field
+                            id="halmos-loop"
+                            type="number"
+                            value="${halmosLoop}"
+                            min="0"
+                        ></vscode-text-field>
+                    </div>
                 </div>
+
             </div>
         `;
     }
