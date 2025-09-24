@@ -42,9 +42,22 @@ jobs:
       - name: Build extension
         run: vsce package
         
-      - name: Release
+      - name: Publish to GitHub Releases
         uses: ncipollo/release-action@v1
         with:
           artifacts: "*.vsix"
           token: ${{ secrets.GITHUB_TOKEN }}
           generateReleaseNotes: true
+
+      - name: Publish to Open VSX Registry
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.OPEN_VSX_TOKEN }}
+          dryRun: true
+
+      - name: Publish to Visual Studio Marketplace
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+          registryUrl: https://marketplace.visualstudio.com
+          dryRun: true
