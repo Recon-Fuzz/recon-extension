@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Seamless integration of Foundry, Medusa, and Echidna for smart contract testing</strong>
+  <strong>Scaffold and run Invariant Tests with Medusa, Echidna and Halmos, automatically debug broken properties with Foundry</strong>
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 The Recon extension is a VS Code extension that streamlines smart contract testing by providing:
 
 - **One-click setup**: Automatically install and configure [Chimera](https://github.com/Recon-Fuzz/chimera) templates
-- **Integrated fuzzing**: Run [Echidna](https://github.com/crytic/echidna) and [Medusa](https://github.com/crytic/medusa) directly from VS Code
+- **Integrated fuzzing**: Run [Echidna](https://github.com/crytic/echidna), [Medusa](https://github.com/crytic/medusa) and [Halmos](https://github.com/a16z/halmos) directly from VS Code
 - **Contract explorer**: Browse and select target contracts and functions
 - **Fuzzer integration**: Quick access to fuzzing tools directly through the extension
 - **Coverage visualization**: View and analyze code coverage from fuzzers
@@ -43,6 +43,7 @@ The Recon extension is a VS Code extension that streamlines smart contract testi
 - Foundry toolchain (forge, cast, anvil)
 - Echidna (optional)
 - Medusa (optional)
+- Halmos (optional)
 
 ### Install from VS Code Marketplace
 
@@ -157,6 +158,8 @@ Recon can be configured through VS Code settings:
 - **Fuzzer not found**: Ensure Echidna/Medusa are installed and in your PATH
 - **Compilation errors**: Run `forge build` manually to identify issues
 - **No contracts showing**: Check if `out/` directory exists with compiled contracts
+- Halmos log parser may have a few bugs
+- The Vyper/foundry compiler integration doesn't have paths, so you have to fix them
 
 ## License
 
