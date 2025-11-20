@@ -138,6 +138,11 @@
           "command": "recon.cleanupCoverageReport",
           "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/ || resourcePath =~ /halmos/)",
           "group": "2_workspace"
+        },
+        {
+          "command": "recon.generateMockAndTargets",
+          "when": "resourceExtname == .sol || resourceExtname == .vy || explorerResourceIsFolder",
+          "group": "2_workspace"
         }
       ],
       "recon-cockpit": [
@@ -284,6 +289,11 @@
         "title": "Forge Build (with build-info)",
         "category": "Recon",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "recon.generateMockAndTargets",
+        "title": "Generate Mock and Targets",
+        "category": "Recon"
       }
     ],
     "configuration": {
