@@ -1536,7 +1536,13 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
     public setContracts(contracts: ContractMetadata[]) {
         this.contracts = contracts;
         contracts.forEach(c => this.collapsedContracts.add(c.name));
-        this.loadState().then(() => this._updateWebview());
+        this.loadState()
+            .then(() => this._updateWebview())
+            .catch(err => {
+                console.error('Error loading state in setContracts:', err);
+                // Still update webview even if state loading fails
+                this._updateWebview();
+            });
     }
 
     // Add watch functionality for recon.json

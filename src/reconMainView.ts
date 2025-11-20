@@ -55,13 +55,20 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'runFuzzer':
                     const defaultFuzzer = vscode.workspace.getConfiguration('recon').get<string>('defaultFuzzer', FuzzerTool.ECHIDNA);
-                    if (defaultFuzzer === FuzzerTool.ECHIDNA) {
-                        vscode.commands.executeCommand('recon.runEchidna', message.value);
-                    } else if (defaultFuzzer === FuzzerTool.MEDUSA) {
-                        vscode.commands.executeCommand('recon.runMedusa', message.value);
-                    } else if (defaultFuzzer === FuzzerTool.HALMOS) {
-                        vscode.commands.executeCommand('recon.runHalmos', message.value);
-                    }
+                    (async () => {
+                        try {
+                            if (defaultFuzzer === FuzzerTool.ECHIDNA) {
+                                await vscode.commands.executeCommand('recon.runEchidna', message.value);
+                            } else if (defaultFuzzer === FuzzerTool.MEDUSA) {
+                                await vscode.commands.executeCommand('recon.runMedusa', message.value);
+                            } else if (defaultFuzzer === FuzzerTool.HALMOS) {
+                                await vscode.commands.executeCommand('recon.runHalmos', message.value);
+                            }
+                        } catch (error) {
+                            console.error('Error running fuzzer:', error);
+                            vscode.window.showErrorMessage(`Failed to run ${defaultFuzzer}: ${error}`);
+                        }
+                    })();
                     break;
             }
         });

@@ -3,6 +3,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { getEnvironmentPath, getFoundryConfigPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
+import { ProcessManager } from '../services/processManager';
 
 export function registerBuildCommands(
     context: vscode.ExtensionContext,
@@ -45,6 +46,10 @@ export function registerBuildCommands(
                             }
                         },
                         (error, stdout, stderr) => {
+                            // Unregister process on completion
+                            if (buildProcess.pid) {
+                                ProcessManager.getInstance().unregisterProcess(buildProcess.pid);
+                            }
                             if (error && !token.isCancellationRequested) {
                                 const errorMsg = `Build failed: ${error.message}`;
                                 outputChannel.appendLine(errorMsg);
@@ -70,11 +75,19 @@ export function registerBuildCommands(
                     );
 
                     token.onCancellationRequested(() => {
+                        if (buildProcess.pid) {
+                            ProcessManager.getInstance().unregisterProcess(buildProcess.pid);
+                        }
                         buildProcess.kill();
                         outputChannel.appendLine('Build cancelled by user');
                         vscode.window.showInformationMessage('Build cancelled');
                         resolve(undefined);
                     });
+                    
+                    // Register process for tracking
+                    if (buildProcess.pid) {
+                        ProcessManager.getInstance().registerProcess(buildProcess, 'forge-build');
+                    }
                 });
             });
         })
@@ -116,6 +129,11 @@ export function registerBuildCommands(
                         cwd: foundryRoot,
                         env: { ...process.env, PATH: getEnvironmentPath() }
                     }, (error, stdout, stderr) => {
+                        // Unregister process on completion
+                        if (buildProcess.pid) {
+                            ProcessManager.getInstance().unregisterProcess(buildProcess.pid);
+                        }
+                        
                         if (error && !token.isCancellationRequested) {
                             const errorMsg = `Build (build-info) failed: ${error.message}`;
                             outputChannel.appendLine(errorMsg);
@@ -140,11 +158,19 @@ export function registerBuildCommands(
                     });
 
                     token.onCancellationRequested(() => {
+                        if (buildProcess.pid) {
+                            ProcessManager.getInstance().unregisterProcess(buildProcess.pid);
+                        }
                         buildProcess.kill();
                         outputChannel.appendLine('Build (build-info) cancelled by user');
                         vscode.window.showInformationMessage('Build (build-info) cancelled');
                         resolve(undefined);
                     });
+                    
+                    // Register process for tracking
+                    if (buildProcess.pid) {
+                        ProcessManager.getInstance().registerProcess(buildProcess, 'forge-build-info');
+                    }
                 });
             });
         })

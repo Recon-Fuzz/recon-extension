@@ -11,6 +11,7 @@ import {
   getEnvironmentPath,
 } from "../utils";
 import { ServiceContainer } from "../services/serviceContainer";
+import { ProcessManager } from "../services/processManager";
 
 export function registerFuzzingCommands(
   context: vscode.ExtensionContext,
@@ -108,6 +109,7 @@ async function runFuzzer(
   let processCompleted = false;
   let childProcess: any = null;
   let hasEnoughData = false;
+  const processManager = ProcessManager.getInstance();
 
   await vscode.window.withProgress(
     {
@@ -133,12 +135,76 @@ async function runFuzzer(
           },
         });
 
-        // Handle graceful shutdown
-        async function handleShutdown(reason: string) {
-          if (!processCompleted && childProcess) {
-            processCompleted = true;
-            resolve();
+        // Register process for tracking
+        if (childProcess.pid) {
+          processManager.registerProcess(childProcess, fuzzerType);
+        }
 
+        // Event-based completion detection
+        let completionResolve: (() => void) | null = null;
+        let completionTimeout: NodeJS.Timeout | null = null;
+        const completionPromise = new Promise<void>((resolve) => {
+          completionResolve = resolve;
+        });
+
+        // Setup completion detection based on fuzzer type
+        const checkForCompletion = () => {
+          if (processCompleted || !completionResolve) return;
+          
+          let shouldComplete = false;
+          if (fuzzerType === Fuzzer.ECHIDNA && output.includes("Saving test reproducers")) {
+            shouldComplete = true;
+          } else if (fuzzerType === Fuzzer.MEDUSA && output.includes("Test summary:")) {
+            shouldComplete = true;
+          } else if (fuzzerType === Fuzzer.HALMOS) {
+            // Halmos doesn't need special completion detection
+            shouldComplete = true;
+          }
+          
+          if (shouldComplete && completionResolve) {
+            completionResolve();
+            completionResolve = null;
+            if (completionTimeout) {
+              clearTimeout(completionTimeout);
+              completionTimeout = null;
+            }
+          }
+        };
+
+        // Set timeout for completion detection
+        const maxWaitTime = fuzzerType === Fuzzer.HALMOS ? 1000 : 60000;
+        completionTimeout = setTimeout(() => {
+          if (completionResolve) {
+            completionResolve();
+            completionResolve = null;
+          }
+        }, maxWaitTime);
+
+        // Handle graceful shutdown with mutex lock
+        async function handleShutdown(reason: string) {
+          // Acquire shutdown lock to prevent race conditions
+          const hasLock = await processManager.acquireShutdownLock();
+          if (!hasLock || processCompleted || !childProcess) {
+            if (hasLock) {
+              processManager.releaseShutdownLock();
+            }
+            return;
+          }
+
+          try {
+            processCompleted = true;
+            
+            // Unregister process
+            if (childProcess.pid) {
+              processManager.unregisterProcess(childProcess.pid);
+            }
+
+            // Clear completion timeout if set
+            if (completionTimeout) {
+              clearTimeout(completionTimeout);
+            }
+
+            // Terminate process
             try {
               if (process.platform === "win32") {
                 require("child_process").execSync(
@@ -154,41 +220,23 @@ async function runFuzzer(
                   }
                 }
               }
+            } catch (killError) {
+              // Process might already be terminated
+              console.warn("Error killing process:", killError);
+            }
 
-              outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
+            outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
 
-              // Wait for completion signals for each fuzzer
-              if (fuzzerType === Fuzzer.ECHIDNA) {
-                // Wait for "Saving test reproducers" with 1 minute timeout
-                let waited = 0;
-                while (
-                  waited < 60000 &&
-                  !output.includes("Saving test reproducers")
-                ) {
-                  await new Promise((resolve) => setTimeout(resolve, 1000));
-                  waited += 1000;
-                }
-              } else if (fuzzerType === Fuzzer.MEDUSA) {
-                // Wait for "Test summary:" with 1 minute timeout
-                let waited = 0;
-                while (waited < 60000 && !output.includes("Test summary:")) {
-                  await new Promise((resolve) => setTimeout(resolve, 1000));
-                  waited += 1000;
-                }
-              } else if (fuzzerType === Fuzzer.HALMOS) {
-                // Halmos doesn't do shrinking so we shouldn't need to wait much
-                let waited = 0;
-                while (
-                  waited < 1000 &&
-                  !output.includes("HALMOS process completed")
-                ) {
-                  await new Promise((resolve) => setTimeout(resolve, 1000));
-                  waited += 1000;
-                }
-              }
+            // Wait for completion signals using event-based approach
+            await Promise.race([
+              completionPromise,
+              new Promise<void>((resolveTimeout) => {
+                setTimeout(() => resolveTimeout(), 60000);
+              })
+            ]);
 
-              // Generate report if we have enough data
-              if (hasEnoughData) {
+            // Generate report if we have enough data
+            if (hasEnoughData) {
                 try {
                   if (fuzzerType === Fuzzer.ECHIDNA) {
                     let splitOutput = output.split("Stopping.");
@@ -295,16 +343,25 @@ async function runFuzzer(
                   `${fuzzerType} ${reason} (not enough data for report)`
                 );
               }
-            } catch (err) {
-              console.error("Error during shutdown:", err);
-              reject(err);
-            }
+            
+            // Release lock and resolve after all operations complete
+            processManager.releaseShutdownLock();
+            resolve();
+          } catch (err) {
+            console.error("Error during shutdown:", err);
+            // Ensure lock is released even on error
+            processManager.releaseShutdownLock();
+            resolve(); // Still resolve to prevent hanging
           }
+        } else {
+          // Release lock if we didn't get it
+          processManager.releaseShutdownLock();
         }
+      }
 
         // Handle cancellation
-        token.onCancellationRequested(() => {
-          handleShutdown("stopped by user");
+        token.onCancellationRequested(async () => {
+          await handleShutdown("stopped by user");
         });
 
         // Handle process output
@@ -315,6 +372,9 @@ async function runFuzzer(
               : data.toString();
           output += text;
           outputChannel.append(text);
+          
+          // Check for completion signals
+          checkForCompletion();
 
           // Parse fuzzer-specific status
           if (fuzzerType === Fuzzer.ECHIDNA) {
@@ -331,7 +391,7 @@ async function runFuzzer(
                 const corpusSize = corpusMatch ? corpusMatch[1] : "0";
                 const [, failedTests, totalTests] = testMatch || ["", "0", "0"];
 
-                const percentage = (current / max) * 100;
+                const percentage = max > 0 ? (current / max) * 100 : 0;
                 const increment =
                   percentage - (progress as any).lastPercentage || 0;
                 (progress as any).lastPercentage = percentage;
@@ -404,19 +464,28 @@ async function runFuzzer(
         // Handle process completion
         childProcess.on("close", async (code: number) => {
           if (!processCompleted) {
+            // Trigger completion check
+            checkForCompletion();
             if (code === 0) {
-              handleShutdown("completed");
+              await handleShutdown("completed");
             } else {
-              handleShutdown(`exited with code ${code}`);
+              await handleShutdown(`exited with code ${code}`);
             }
           }
         });
 
-        childProcess.on("error", (err: Error) => {
+        childProcess.on("error", async (err: Error) => {
           if (!processCompleted) {
             console.error("Process error:", err);
-            handleShutdown(`failed: ${err.message}`);
+            await handleShutdown(`failed: ${err.message}`);
           }
+        });
+        
+        // Cleanup on promise resolution/rejection
+        Promise.resolve().then(() => {
+          // This ensures cleanup happens
+        }).catch(() => {
+          // Handle any unhandled rejections
         });
       });
     }

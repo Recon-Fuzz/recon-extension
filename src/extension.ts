@@ -10,10 +10,18 @@ import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
+import { ProcessManager } from './services/processManager';
+
+// Global process manager instance
+let processManager: ProcessManager;
+let outputService: OutputService;
+let contractWatcherService: ContractWatcherService;
 
 export async function activate(context: vscode.ExtensionContext) {
+    // Initialize process manager
+    processManager = ProcessManager.getInstance();
     // Create services
-    const outputService = new OutputService(context);
+    outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
     const workspaceService = new WorkspaceService();
 
@@ -31,7 +39,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // Create and setup contract watcher
-    const contractWatcherService = new ContractWatcherService(reconContractsProvider, context);
+    contractWatcherService = new ContractWatcherService(reconContractsProvider, context);
+    context.subscriptions.push(contractWatcherService);
     // await contractWatcherService.initializeWatcher();
 
     // Register CodeLens provider
@@ -53,8 +62,17 @@ export async function activate(context: vscode.ExtensionContext) {
         contractWatcherService,
         workspaceService
     });
-    vscode.commands.executeCommand('recon.refreshContracts');
-    vscode.commands.executeCommand('recon.refreshCoverage');
+    // Execute refresh commands with proper error handling
+    Promise.all([
+        vscode.commands.executeCommand('recon.refreshContracts').catch(err => {
+            console.error('Error refreshing contracts:', err);
+        }),
+        vscode.commands.executeCommand('recon.refreshCoverage').catch(err => {
+            console.error('Error refreshing coverage:', err);
+        })
+    ]).catch(err => {
+        console.error('Error during extension activation:', err);
+    });
 
     // Register Log to Foundry command
     context.subscriptions.push(
@@ -118,4 +136,27 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 }
 
-export function deactivate() { }
+export async function deactivate() {
+    try {
+        // Terminate all tracked child processes
+        if (processManager) {
+            const activeCount = processManager.getActiveProcessCount();
+            if (activeCount > 0) {
+                console.log(`Terminating ${activeCount} active processes...`);
+                await processManager.terminateAll();
+            }
+        }
+
+        // Dispose output channels
+        if (outputService) {
+            outputService.dispose();
+        }
+
+        // Dispose contract watcher
+        if (contractWatcherService) {
+            contractWatcherService.dispose();
+        }
+    } catch (error) {
+        console.error('Error during extension deactivation:', error);
+    }
+}
