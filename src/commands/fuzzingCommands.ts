@@ -10,6 +10,7 @@ import {
   getUid,
   getEnvironmentPath,
 } from "../utils";
+import { applyDynamicReplacements } from "../utils/dynamicReplacement";
 import { ServiceContainer } from "../services/serviceContainer";
 
 export function registerFuzzingCommands(
@@ -56,6 +57,9 @@ async function runFuzzer(
     vscode.window.showErrorMessage("Please open a workspace first");
     return;
   }
+
+  // Apply dynamic replacements before running fuzzer
+  await applyDynamicReplacements();
 
   const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
