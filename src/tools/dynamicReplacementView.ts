@@ -355,12 +355,18 @@ export class DynamicReplacementViewProvider {
         let content = await fs.readFile(setupPath, 'utf8');
 
         // Apply replacements to the file
-        // Process in reverse order to maintain correct indices
-        for (const replacement of replacements.reverse()) {
+        // Sort by last occurrence in file (process from end to beginning) to prevent index issues
+        const sortedReplacements = [...replacements].sort((a, b) => {
+            const aIndex = content.lastIndexOf(a.target);
+            const bIndex = content.lastIndexOf(b.target);
+            return bIndex - aIndex; // Process from end to beginning
+        });
+
+        for (const replacement of sortedReplacements) {
             // Escape special regex characters in target
             const escapedTarget = replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             // Build the full pattern with end marker
-            const fullPattern = escapedTarget + replacement.endOfTargetMarker;
+            const fullPattern = escapedTarget + (replacement.endOfTargetMarker || '[^;]*');
             const regex = new RegExp(fullPattern, 'g');
             
             // Escape special regex characters in replacement too (but keep backreferences)
