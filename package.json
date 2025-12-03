@@ -470,7 +470,7 @@
     "html2canvas": "^1.4.1",
     "jsdom": "^26.1.0",
     "prismjs": "^1.30.0",
-    "solc-typed-ast": "^18.2.5",
+    "solc-typed-ast": "^18.2.6",
     "yaml": "^2.8.0"
   },
   "overrides": {
