@@ -76,9 +76,15 @@ export class DynamicReplacementViewProvider {
                     break;
                 case 'updateSetupFile':
                     try {
-                        await this.updateSetupFile(message.replacements);
-                        // Also save to recon.json
-                        await this.saveReplacementsToReconJson(message.replacements);
+                        // Load replacements from recon.json (in case user manually edited it)
+                        const replacementsFromJson = await this.loadReplacementsFromReconJson();
+                        // Use replacements from recon.json if available, otherwise use UI replacements
+                        const replacementsToUse = replacementsFromJson.length > 0 
+                            ? replacementsFromJson 
+                            : message.replacements;
+                        await this.updateSetupFile(replacementsToUse);
+                        // Also save to recon.json (merge with existing)
+                        await this.saveReplacementsToReconJson(replacementsToUse);
                         vscode.window.showInformationMessage('Setup.sol updated and saved to recon.json');
                         await panel.webview.postMessage({
                             type: 'setupFileUpdated',
