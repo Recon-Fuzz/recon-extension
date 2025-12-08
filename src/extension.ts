@@ -64,13 +64,13 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     // Execute refresh commands with proper error handling
     Promise.all([
-        vscode.commands.executeCommand('recon.refreshContracts').catch(err => {
+        Promise.resolve(vscode.commands.executeCommand('recon.refreshContracts')).catch((err: any) => {
             console.error('Error refreshing contracts:', err);
         }),
-        vscode.commands.executeCommand('recon.refreshCoverage').catch(err => {
+        Promise.resolve(vscode.commands.executeCommand('recon.refreshCoverage')).catch((err: any) => {
             console.error('Error refreshing coverage:', err);
         })
-    ]).catch(err => {
+    ]).catch((err: any) => {
         console.error('Error during extension activation:', err);
     });
 

@@ -353,11 +353,7 @@ async function runFuzzer(
             processManager.releaseShutdownLock();
             resolve(); // Still resolve to prevent hanging
           }
-        } else {
-          // Release lock if we didn't get it
-          processManager.releaseShutdownLock();
         }
-      }
 
         // Handle cancellation
         token.onCancellationRequested(async () => {
