@@ -40,9 +40,12 @@ export class DynamicReplacementViewProvider {
                 case 'loadConstants':
                     try {
                         const constants = await this.loadConstantsFromSetup();
+                        // Load existing replacements from recon.json to populate values
+                        const existingReplacements = await this.loadReplacementsFromReconJson();
                         await panel.webview.postMessage({
                             type: 'constantsLoaded',
                             constants,
+                            existingReplacements,
                         });
                     } catch (error) {
                         const errorMessage =
@@ -50,6 +53,10 @@ export class DynamicReplacementViewProvider {
                         vscode.window.showErrorMessage(
                             `Error loading constants: ${errorMessage}`
                         );
+                        await panel.webview.postMessage({
+                            type: 'error',
+                            message: errorMessage,
+                        });
                     }
                     break;
                 case 'saveReplacements':
@@ -121,6 +128,29 @@ export class DynamicReplacementViewProvider {
         }
 
         throw new Error('Setup.sol not found. Please ensure Setup.sol exists in test/recon/ directory');
+    }
+
+    private async loadReplacementsFromReconJson(): Promise<DynamicReplacement[]> {
+        if (!vscode.workspace.workspaceFolders) {
+            return [];
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        const reconJsonPath = path.join(workspaceRoot, 'recon.json');
+
+        try {
+            const content = await fs.readFile(reconJsonPath, 'utf8');
+            const reconJson = JSON.parse(content);
+
+            if (!reconJson.prepareContracts || !Array.isArray(reconJson.prepareContracts)) {
+                return [];
+            }
+
+            return reconJson.prepareContracts as DynamicReplacement[];
+        } catch {
+            // File doesn't exist or invalid JSON, return empty array
+            return [];
+        }
     }
 
     private async loadConstantsFromSetup(): Promise<ConstantInfo[]> {
@@ -238,17 +268,19 @@ export class DynamicReplacementViewProvider {
         const constants: ConstantInfo[] = [];
         const lines = content.split('\n');
 
-        // More comprehensive pattern to match constant declarations
+        // Pattern to match constant declarations only
         // Matches: constant TYPE NAME = VALUE; or TYPE constant NAME = VALUE;
         // Also handles public/private/internal/external modifiers
-        const constantPattern = /(?:public\s+|private\s+|internal\s+|external\s+)?(?:constant\s+)?(\w+(?:\s*\[\s*\])?)\s+(?:constant\s+)?(\w+)\s*=\s*([^;]+);/g;
+        // REQUIRES the constant keyword to be present
+        const constantPattern = /(?:public\s+|private\s+|internal\s+|external\s+)?(?:constant\s+(\w+(?:\s*\[\s*\])?)\s+(\w+)|(\w+(?:\s*\[\s*\])?)\s+constant\s+(\w+))\s*=\s*([^;]+);/g;
 
         let match;
         while ((match = constantPattern.exec(content)) !== null) {
             const fullMatch = match[0];
-            const type = match[1].trim();
-            const name = match[2].trim();
-            const value = match[3].trim();
+            // Match group 1,2 for "constant TYPE NAME" or 3,4 for "TYPE constant NAME"
+            const type = (match[1] || match[3] || '').trim();
+            const name = (match[2] || match[4] || '').trim();
+            const value = (match[5] || '').trim();
 
             // Find line number
             const lineNumber = content.substring(0, match.index).split('\n').length;
@@ -318,7 +350,7 @@ export class DynamicReplacementViewProvider {
 
         // The format should match the runner's expected format
         // Based on the issue description, prepareContracts is an array
-        if (!reconJson.prepareContracts) {
+        if (!reconJson.prepareContracts || !Array.isArray(reconJson.prepareContracts)) {
             reconJson.prepareContracts = [];
         }
 
@@ -365,13 +397,14 @@ export class DynamicReplacementViewProvider {
         for (const replacement of sortedReplacements) {
             // Escape special regex characters in target
             const escapedTarget = replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // Build the full pattern with end marker
+            // Build the full pattern with end marker (no global flag - replace one at a time)
             const fullPattern = escapedTarget + (replacement.endOfTargetMarker || '[^;]*');
-            const regex = new RegExp(fullPattern, 'g');
+            const regex = new RegExp(fullPattern);
             
             // Escape special regex characters in replacement too (but keep backreferences)
             const escapedReplacement = replacement.replacement.replace(/\$/g, '$$$$');
             
+            // Replace only the first occurrence at the sorted position
             content = content.replace(regex, escapedReplacement);
         }
 
@@ -471,7 +504,29 @@ export class DynamicReplacementViewProvider {
             switch (message.type) {
                 case 'constantsLoaded':
                     constants = message.constants;
+                    // Load existing replacements from recon.json to populate values
+                    if (message.existingReplacements) {
+                        const replacementMap = {};
+                        message.existingReplacements.forEach(r => {
+                            // Extract constant name from target pattern (e.g., "name = value" -> "name")
+                            const match = r.target.match(/^(\w+)\s*=/);
+                            if (match) {
+                                replacementMap[match[1]] = r.replacement.match(/=\s*(.+)$/)?.[1] || '';
+                            }
+                        });
+                        // Update constants with values from recon.json
+                        constants = constants.map(c => {
+                            if (replacementMap[c.name]) {
+                                return { ...c, currentValue: replacementMap[c.name] };
+                            }
+                            return c;
+                        });
+                    }
                     renderConstants();
+                    break;
+                case 'error':
+                    const container = document.getElementById('constants-container');
+                    container.innerHTML = \`<p style="color: var(--vscode-errorForeground);">\${escapeHtml(message.message)}</p>\`;
                     break;
                 case 'replacementsSaved':
                     vscode.postMessage({ type: 'showInfo', text: 'Replacements saved successfully' });
@@ -482,6 +537,13 @@ export class DynamicReplacementViewProvider {
             }
         });
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         function renderConstants() {
             const container = document.getElementById('constants-container');
             if (constants.length === 0) {
@@ -489,20 +551,26 @@ export class DynamicReplacementViewProvider {
                 return;
             }
 
-            container.innerHTML = constants.map((constant, index) => \`
+            container.innerHTML = constants.map((constant, index) => {
+                // Escape HTML to prevent XSS
+                const safeName = escapeHtml(constant.name);
+                const safeType = escapeHtml(constant.type);
+                const safeValue = escapeHtml(constant.currentValue);
+                return \`
                 <div class="constant-item">
-                    <div class="constant-name">\${constant.name}</div>
-                    <div class="constant-type">Type: \${constant.type}</div>
+                    <div class="constant-name">\${safeName}</div>
+                    <div class="constant-type">Type: \${safeType}</div>
                     <div class="constant-value">
                         <label>Current Value:</label>
                         <vscode-text-field 
                             id="value-\${index}" 
-                            value="\${constant.currentValue}" 
+                            value="\${safeValue}" 
                             placeholder="Enter replacement value"
                         ></vscode-text-field>
                     </div>
                 </div>
-            \`).join('');
+            \`;
+            }).join('');
 
             // Add event listeners
             constants.forEach((constant, index) => {

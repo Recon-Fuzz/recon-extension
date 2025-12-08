@@ -65,7 +65,8 @@ export async function applyDynamicReplacements(): Promise<void> {
         for (const replacement of sortedReplacements) {
             const escapedTarget = replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const fullPattern = escapedTarget + (replacement.endOfTargetMarker || '[^;]*');
-            const regex = new RegExp(fullPattern, 'g');
+            // Remove global flag - replace one occurrence at a time based on sorted position
+            const regex = new RegExp(fullPattern);
             const escapedReplacement = replacement.replacement.replace(/\$/g, '$$$$');
             fileContent = fileContent.replace(regex, escapedReplacement);
         }
