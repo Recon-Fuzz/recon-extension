@@ -69,7 +69,7 @@ async function runFuzzer(
     const testLimit = config.get<number>("testLimit", 1000000);
     const mode = config.get<string>("mode", "assertion");
 
-    command = `echidna . --contract ${
+    command = `echidna tests/recon/CryticTester.sol --contract ${
       target || "CryticTester"
     } --config echidna.yaml --format text --workers ${
       workers || 10
