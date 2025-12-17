@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { getFoundryConfigPath } from '../utils';
+import { getFoundryConfigPath, getTestFolder } from '../utils';
 import { Actor, Mode, FunctionDefinitionParams } from '../types';
 import { targetFunctionTemplate } from '../generators/templates/target-function';
 import { ServiceContainer } from '../services/serviceContainer';
+import { canaryFunctionTemplate } from '../generators/templates/canary-function';
 
 export function registerTestCommands(
     context: vscode.ExtensionContext,
@@ -84,18 +85,101 @@ export function registerTestCommands(
             uri: vscode.Uri,
             contractName: string,
             functionName: string,
-            mode: Mode,
+            {oldMode, newMode}: {oldMode: Mode, newMode: Mode},
             range: vscode.Range,
             fnParams: FunctionDefinitionParams
         ) => {
-            if (!vscode.workspace.workspaceFolders) { return; }
-
+            if (
+                !vscode.workspace.workspaceFolders ||
+                oldMode === newMode
+            ) { return; }
+            
             try {
                 // Update recon.json - use jsonPath if available, otherwise fall back to contractName lookup
                 const pathName = fnParams.jsonPath || contractName;
                 await services.reconContractsProvider.updateFunctionConfig(pathName, functionName, {
-                    mode
+                    mode: newMode
                 });
+    
+                // Get base paths for CanaryStorage and Properties files
+                const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+                const foundryRoot = path.dirname(getFoundryConfigPath(workspaceRoot));
+                const testFolder = await getTestFolder(workspaceRoot);
+                const reconPath = path.join(foundryRoot, testFolder, 'recon');
+
+                // Update CanaryStorage.sol: add or remove canary variable
+                const storagePath = path.join(reconPath, 'CanaryStorage.sol');
+                const storageUri = vscode.Uri.file(storagePath);
+                const storageDocument = await vscode.workspace.openTextDocument(storageUri);
+                const storageEditor = await vscode.window.showTextDocument(storageDocument);
+                const storageText = storageDocument.getText();
+
+                const storageCanaryVariable = `    bool ${fnParams.abi.name}Canary = false;\n`;
+                
+                if (newMode === Mode.CANARY) { // Find placeholder line and insert canary variable just bellow it
+                    const storageMatch = storageText.indexOf('/// AUTO GENERATED CANARIES - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///');
+                    if (storageMatch === -1) {
+                        throw new Error('CanaryStorage.sol is missing the canary placeholder line.');
+                    }
+                    const storageLine = storageText.substring(0, storageMatch).split('\n').length - 1;
+                    const insertionPosition = new vscode.Position(storageLine + 1, 0);
+
+                    await storageEditor.edit(editBuilder => {
+                        editBuilder.insert(insertionPosition, storageCanaryVariable);
+                    });
+
+                } else { // Find the canary variable if it exists and remove it
+                    const storageMatch = storageText.indexOf(storageCanaryVariable);
+                    if (storageMatch !== -1) {
+                        const startPos = storageDocument.positionAt(storageMatch);
+                        const endPos = storageDocument.positionAt(storageMatch + storageCanaryVariable.length);
+                        const rangeToDelete = new vscode.Range(startPos, endPos);
+
+                        await storageEditor.edit(editBuilder => {
+                            editBuilder.delete(rangeToDelete);
+                        });
+                    }
+                }
+                await storageDocument.save();
+
+                // Update Properties.sol: add or remove canary function
+                const propertiesPath = path.join(reconPath, 'Properties.sol');
+                const propertiesUri = vscode.Uri.file(propertiesPath);
+                const propertiesDocument = await vscode.workspace.openTextDocument(propertiesUri);
+                const propertiesEditor = await vscode.window.showTextDocument(propertiesDocument);
+                const propertiesText = propertiesDocument.getText();
+
+                const canaryFunctionDef = canaryFunctionTemplate({
+                    fn: {
+                        ...fnParams,
+                    }
+                });
+
+                if (newMode === Mode.CANARY) { // Find placeholder line and insert canary function just bellow it
+                    const propertiesMatch = propertiesText.indexOf('/// AUTO GENERATED CANARIES FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///');
+                    if (propertiesMatch === -1) {
+                        throw new Error('Properties.sol is missing the canary placeholder line.');
+                    }
+                    const propertiesLine = propertiesText.substring(0, propertiesMatch).split('\n').length - 1;
+                    const insertionPosition = new vscode.Position(propertiesLine + 1, 0);
+
+                    await propertiesEditor.edit(editBuilder => {
+                        editBuilder.insert(insertionPosition, canaryFunctionDef + '\n');
+                    });
+
+                } else { // Find the canary function if it exists and remove it
+                    const propertiesMatch = propertiesText.indexOf(canaryFunctionDef);
+                    if (propertiesMatch !== -1) {
+                        const startPos = propertiesDocument.positionAt(propertiesMatch);
+                        const endPos = propertiesDocument.positionAt(propertiesMatch + canaryFunctionDef.length + 1);
+                        const rangeToDelete = new vscode.Range(startPos, endPos);
+
+                        await propertiesEditor.edit(editBuilder => {
+                            editBuilder.delete(rangeToDelete);
+                        });
+                    }
+                }
+                await propertiesDocument.save();
 
                 // Get current document and edit
                 const document = await vscode.workspace.openTextDocument(uri);
@@ -105,7 +189,7 @@ export function registerTestCommands(
                 const newFunctionDef = targetFunctionTemplate({
                     fn: {
                         ...fnParams,
-                        mode
+                        mode: newMode,
                     }
                 }).trimStart();
 
