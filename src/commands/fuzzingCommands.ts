@@ -198,11 +198,24 @@ async function runFuzzer(
                     }
                   }
                   const results = processLogs(output, fuzzerType);
-                  const reportContent = generateJobMD(
+                  let reportContent = generateJobMD(
                     fuzzerType,
                     output,
                     vscode.workspace.name || "Recon Project"
                   );
+
+                  // Fix table header for optimization mode
+                  if (fuzzerType === Fuzzer.ECHIDNA) {
+                    const echidnaMode = vscode.workspace
+                      .getConfiguration("recon.echidna")
+                      .get<string>("mode", "assertion");
+                    if (echidnaMode === "optimization") {
+                      reportContent = reportContent.replace(
+                        "| Property | Status |",
+                        "| Property | Max Value |"
+                      );
+                    }
+                  }
 
                   const showReport = await vscode.window.showInformationMessage(
                     `Fuzzing completed. View detailed report?`,
