@@ -139,24 +139,24 @@ async function runFuzzer(
             processCompleted = true;
             resolve();
 
-            try {
-              if (process.platform === "win32") {
-                require("child_process").execSync(
-                  `taskkill /pid ${childProcess.pid} /T /F`,
-                  { stdio: "ignore" }
-                );
-              } else {
-                if (reason === "stopped by user") {
-                  if (fuzzerType === Fuzzer.MEDUSA) {
-                    process.kill(-childProcess.pid, "SIGINT");
-                  } else {
-                    process.kill(-childProcess.pid, "SIGTERM");
-                  }
+            if (process.platform === "win32") {
+              require("child_process").execSync(
+                `taskkill /pid ${childProcess.pid} /T /F`,
+                { stdio: "ignore" }
+              );
+            } else {
+              if (reason === "stopped by user") {
+                if (fuzzerType === Fuzzer.MEDUSA) {
+                  process.kill(-childProcess.pid, "SIGINT");
+                } else {
+                  process.kill(-childProcess.pid, "SIGTERM");
                 }
               }
+            }
 
-              outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
+            outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
 
+            try {
               // Wait for completion signals for each fuzzer
               if (fuzzerType === Fuzzer.ECHIDNA) {
                 // Wait for "Saving test reproducers" with 1 minute timeout
@@ -204,16 +204,59 @@ async function runFuzzer(
                     vscode.workspace.name || "Recon Project"
                   );
 
-                  // Fix table header for optimization mode
+                  // Fix table header and rows for optimization mode
                   if (fuzzerType === Fuzzer.ECHIDNA) {
                     const echidnaMode = vscode.workspace
                       .getConfiguration("recon.echidna")
                       .get<string>("mode", "assertion");
                     if (echidnaMode === "optimization") {
+                      // Replace table header
                       reportContent = reportContent.replace(
                         "| Property | Status |",
                         "| Property | Max Value |"
                       );
+
+                      // Parse optimization results from raw output
+                      const optimizationResults: { property: string; value: string }[] = [];
+                      const lines = output.split('\n');
+                      for (const line of lines) {
+                        if (line.includes(': max value:')) {
+                          const parts = line.split(': max value:');
+                          const property = parts[0].trim();
+                          const value = parts[1].trim();
+                          optimizationResults.push({ property, value });
+                        }
+                      }
+
+                      // Build table rows with dynamic column widths
+                      if (optimizationResults.length > 0) {
+                        // Calculate column widths
+                        const propertyHeader = "Property";
+                        const valueHeader = "Max Value";
+                        const maxPropertyLen = Math.max(
+                          propertyHeader.length,
+                          ...optimizationResults.map(r => r.property.length)
+                        );
+                        const maxValueLen = Math.max(
+                          valueHeader.length,
+                          ...optimizationResults.map(r => r.value.length)
+                        );
+
+                        // Build dynamic table
+                        const headerRow = `| ${propertyHeader.padEnd(maxPropertyLen)} | ${valueHeader.padEnd(maxValueLen)} |`;
+                        const separatorRow = `|${'-'.repeat(maxPropertyLen + 2)}|${'-'.repeat(maxValueLen + 2)}|`;
+                        const tableRows = optimizationResults
+                          .map(r => `| ${r.property.padEnd(maxPropertyLen)} | ${r.value.padEnd(maxValueLen)} |`)
+                          .join('\n');
+
+                        // Replace all empty tables by splitting and rejoining
+                        const fullTable = `${headerRow}\n${separatorRow}\n${tableRows}`;
+                        // The original separator has 10 dashes for Property and 8 for Status
+                        // After header replacement, it's still |----------|--------|
+                        const emptyTable = "| Property | Max Value |\n|----------|--------|";
+                        const parts = reportContent.split(emptyTable);
+                        reportContent = parts.join(fullTable);
+                      }
                     }
                   }
 
