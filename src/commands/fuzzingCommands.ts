@@ -69,16 +69,9 @@ async function runFuzzer(
     const testLimit = config.get<number>("testLimit", 1000000);
     const mode = config.get<string>("mode", "assertion");
 
-    // Try specific file path first for better compatibility
-    const testFolder = await getTestFolder(workspaceRoot);
-    const targetFile = path.join(testFolder, "recon", `${target || "CryticTester"}.sol`);
-    const targetFileExists = await fs.access(path.join(foundryRoot, targetFile)).then(() => true).catch(() => false);
-
-    const echidnaTarget = targetFileExists ? targetFile : ".";
-
-    command = `echidna ${echidnaTarget} --contract ${
+    command = `echidna . --contract ${
       target || "CryticTester"
-    } --format text --workers ${
+    } --config echidna.yaml --format text --workers ${
       workers || 10
     } --test-limit ${testLimit} --test-mode ${mode}`;
   } else if (fuzzerType === Fuzzer.MEDUSA) {
@@ -132,8 +125,8 @@ async function runFuzzer(
         childProcess = require("child_process").spawn(command, {
           cwd: foundryRoot,
           shell: true,
-          detached: process.platform !== "win32",
-          stdio: "pipe",
+          detached: true,
+          ...(process.platform !== "win32" && { stdio: "pipe" }),
           env: {
             ...process.env,
             PATH: getEnvironmentPath(),
@@ -146,25 +139,19 @@ async function runFuzzer(
             processCompleted = true;
             resolve();
 
-            // Try to kill the process (ignore errors if already exited)
-            try {
-              if (process.platform === "win32") {
-                require("child_process").execSync(
-                  `taskkill /pid ${childProcess.pid} /T /F`,
-                  { stdio: "ignore" }
-                );
-              } else {
-                if (reason === "stopped by user") {
-                  if (fuzzerType === Fuzzer.MEDUSA) {
-                    process.kill(-childProcess.pid, "SIGINT");
-                  } else {
-                    process.kill(-childProcess.pid, "SIGTERM");
-                  }
+            if (process.platform === "win32") {
+              require("child_process").execSync(
+                `taskkill /pid ${childProcess.pid} /T /F`,
+                { stdio: "ignore" }
+              );
+            } else {
+              if (reason === "stopped by user") {
+                if (fuzzerType === Fuzzer.MEDUSA) {
+                  process.kill(-childProcess.pid, "SIGINT");
+                } else {
+                  process.kill(-childProcess.pid, "SIGTERM");
                 }
               }
-            } catch (killError) {
-              // Process may have already exited, ignore kill errors
-              console.log("Process kill failed (may have already exited):", killError);
             }
 
             outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
@@ -172,14 +159,11 @@ async function runFuzzer(
             try {
               // Wait for completion signals for each fuzzer
               if (fuzzerType === Fuzzer.ECHIDNA) {
-                const echidnaMode = vscode.workspace.getConfiguration("recon.echidna").get<string>("mode", "assertion");
-                // In optimization mode, look for "max value:" instead of "Saving test reproducers"
-                const completionSignal = echidnaMode === "optimization" ? "max value:" : "Saving test reproducers";
-                // Wait for completion signal with 1 minute timeout
+                // Wait for "Saving test reproducers" with 1 minute timeout
                 let waited = 0;
                 while (
                   waited < 60000 &&
-                  !output.includes(completionSignal)
+                  !output.includes("Saving test reproducers")
                 ) {
                   await new Promise((resolve) => setTimeout(resolve, 1000));
                   waited += 1000;
@@ -204,9 +188,7 @@ async function runFuzzer(
               }
 
               // Generate report if we have enough data
-              console.log("DEBUG: hasEnoughData =", hasEnoughData);
               if (hasEnoughData) {
-                console.log("DEBUG: Generating report...");
                 try {
                   if (fuzzerType === Fuzzer.ECHIDNA) {
                     let splitOutput = output.split("Stopping.");
@@ -216,13 +198,11 @@ async function runFuzzer(
                     }
                   }
                   const results = processLogs(output, fuzzerType);
-                  console.log("DEBUG: results =", JSON.stringify(results));
                   let reportContent = generateJobMD(
                     fuzzerType,
                     output,
                     vscode.workspace.name || "Recon Project"
                   );
-                  console.log("DEBUG: Generated report length:", reportContent.length);
 
                   // Fix table header and rows for optimization mode
                   if (fuzzerType === Fuzzer.ECHIDNA) {
@@ -279,8 +259,6 @@ async function runFuzzer(
                       }
                     }
                   }
-
-                  console.log("DEBUG: Final reportContent:", reportContent);
 
                   const showReport = await vscode.window.showInformationMessage(
                     `Fuzzing completed. View detailed report?`,
@@ -391,17 +369,13 @@ async function runFuzzer(
             fuzzerType === Fuzzer.MEDUSA || fuzzerType === Fuzzer.HALMOS
               ? stripAnsiCodes(data.toString())
               : data.toString();
-          console.log("STDOUT:", text);
           output += text;
           outputChannel.append(text);
 
           // Parse fuzzer-specific status
           if (fuzzerType === Fuzzer.ECHIDNA) {
-            // Also detect optimization mode output
-            if (text.includes("max value:") || text.includes("[status] tests:")) {
-              hasEnoughData = true;
-            }
             if (text.includes("[status] tests:")) {
+              hasEnoughData = true;
               const testMatch = text.match(/tests: (\d+)\/(\d+)/);
               const fuzzingMatch = text.match(/fuzzing: (\d+)\/(\d+)/);
               const corpusMatch = text.match(/corpus: (\d+)/);
@@ -479,7 +453,6 @@ async function runFuzzer(
         // Handle stderr
         childProcess.stderr.on("data", (data: Buffer) => {
           const text = data.toString();
-          console.log("STDERR:", text);
           output += text;
           outputChannel.append(text);
         });
