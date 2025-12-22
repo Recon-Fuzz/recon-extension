@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { registerCommands } from './commands';
+import { PropertyToggleCodeLensProvider, getIgnorePatterns, setIgnorePatterns } from './providers/propertyToggleCodeLens';
+import { togglePropertyIgnore, showPropertyStatus, listIgnoredProperties, clearIgnoredProperties, addPropertyToIgnore, removePropertyFromIgnore } from './commands/propertyToggleCommands';
 import { StatusBarService } from './services/statusBarService';
 import { ReconMainViewProvider } from './reconMainView';
 import { ReconContractsViewProvider } from './reconContractsView';
@@ -116,6 +118,58 @@ export async function activate(context: vscode.ExtensionContext) {
             );
         })
     );
+
+    // ===== CodeLens Property Toggle Registration =====
+
+    // Register CodeLens for property toggle
+    const propertyCodeLensProvider = new PropertyToggleCodeLensProvider(context);
+    const codeLensDisposable = vscode.languages.registerCodeLensProvider(
+        { language: 'solidity', scheme: 'file' },
+        propertyCodeLensProvider
+    );
+    context.subscriptions.push(codeLensDisposable);
+
+    // Register toggle command
+    const toggleDisposable = vscode.commands.registerCommand(
+        'recon.togglePropertyIgnore',
+        togglePropertyIgnore
+    );
+    context.subscriptions.push(toggleDisposable);
+
+    // Register status command
+    const statusDisposable = vscode.commands.registerCommand(
+        'recon.showPropertyStatus',
+        showPropertyStatus
+    );
+    context.subscriptions.push(statusDisposable);
+
+    // Register list command
+    const listDisposable = vscode.commands.registerCommand(
+        'recon.listIgnoredProperties',
+        listIgnoredProperties
+    );
+    context.subscriptions.push(listDisposable);
+
+    // Register clear command
+    const clearDisposable = vscode.commands.registerCommand(
+        'recon.clearIgnoredProperties',
+        clearIgnoredProperties
+    );
+    context.subscriptions.push(clearDisposable);
+
+    // Register add property command
+    const addPropertyDisposable = vscode.commands.registerCommand(
+        'recon.addPropertyToIgnore',
+        addPropertyToIgnore
+    );
+    context.subscriptions.push(addPropertyDisposable);
+
+    // Register remove property command
+    const removePropertyDisposable = vscode.commands.registerCommand(
+        'recon.removePropertyFromIgnore',
+        removePropertyFromIgnore
+    );
+    context.subscriptions.push(removePropertyDisposable);
 }
 
 export function deactivate() { }

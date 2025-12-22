@@ -284,6 +284,36 @@
         "title": "Forge Build (with build-info)",
         "category": "Recon",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "recon.togglePropertyIgnore",
+        "title": "Toggle Property Ignore Status",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.showPropertyStatus",
+        "title": "Show Property Status",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.listIgnoredProperties",
+        "title": "List Ignored Properties",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.clearIgnoredProperties",
+        "title": "Clear All Ignored Properties",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.addPropertyToIgnore",
+        "title": "Add Property to Ignore List",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.removePropertyFromIgnore",
+        "title": "Remove Property from Ignore List",
+        "category": "Recon"
       }
     ],
     "configuration": {
@@ -431,6 +461,16 @@
           "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
           "scope": "resource",
           "order": 16
+        },
+        "recon.ignorePropertyPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "resource",
+          "description": "Array of property patterns to ignore (e.g., 'canary_*', 'test_*')",
+          "order": 17
         }
       }
     }
