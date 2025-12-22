@@ -346,7 +346,7 @@ export function registerMockCommands(
 
                 // Save target functions to test folder
                 const testFolder = await getTestFolder(workspaceRoot);
-                const targetFunctionsPath = path.join(testFolder, 'recon', 'targets', `${mockName}Targets.sol`);
+                const targetFunctionsPath = path.join(foundryRoot, testFolder, 'recon', 'targets', `${mockName}Targets.sol`);
                 await fs.mkdir(path.dirname(targetFunctionsPath), { recursive: true });
                 await fs.writeFile(targetFunctionsPath, targetFunctionsContent);
 
