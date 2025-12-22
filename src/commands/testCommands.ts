@@ -95,12 +95,6 @@ export function registerTestCommands(
             ) { return; }
             
             try {
-                // Update recon.json - use jsonPath if available, otherwise fall back to contractName lookup
-                const pathName = fnParams.jsonPath || contractName;
-                await services.reconContractsProvider.updateFunctionConfig(pathName, functionName, {
-                    mode: newMode
-                });
-    
                 // Get base paths for CanaryStorage and Properties files
                 const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
                 const foundryRoot = path.dirname(getFoundryConfigPath(workspaceRoot));
@@ -110,7 +104,16 @@ export function registerTestCommands(
                 // Update CanaryStorage.sol: add or remove canary variable
                 const storagePath = path.join(reconPath, 'CanaryStorage.sol');
                 const storageUri = vscode.Uri.file(storagePath);
-                const storageDocument = await vscode.workspace.openTextDocument(storageUri);
+
+                let storageDocument: vscode.TextDocument | undefined;
+                try {
+                    storageDocument = await vscode.workspace.openTextDocument(storageUri);
+                } catch (error) {
+                    console.error('Error updating function mode:', error);
+                    vscode.window.showWarningMessage(`Please re-run Scaffold to generate the missing file! File "CanaryStorage.sol" not found.`);
+                    return;
+                }
+                
                 const storageEditor = await vscode.window.showTextDocument(storageDocument);
                 const storageText = storageDocument.getText();
 
@@ -119,7 +122,9 @@ export function registerTestCommands(
                 if (newMode === Mode.CANARY) { // Find placeholder line and insert canary variable just bellow it
                     const storageMatch = storageText.indexOf('/// AUTO GENERATED CANARIES - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///');
                     if (storageMatch === -1) {
-                        throw new Error('CanaryStorage.sol is missing the canary placeholder line.');
+                        console.error('CanaryStorage.sol is missing the canary placeholder line.');
+                        vscode.window.showWarningMessage(`Please re-run Scaffold to generate the malformed file! File "CanaryStorage.sol" is missing the canary placeholder line.`);
+                        return;
                     }
                     const storageLine = storageText.substring(0, storageMatch).split('\n').length - 1;
                     const insertionPosition = new vscode.Position(storageLine + 1, 0);
@@ -145,7 +150,16 @@ export function registerTestCommands(
                 // Update Properties.sol: add or remove canary function
                 const propertiesPath = path.join(reconPath, 'Properties.sol');
                 const propertiesUri = vscode.Uri.file(propertiesPath);
-                const propertiesDocument = await vscode.workspace.openTextDocument(propertiesUri);
+
+                let propertiesDocument: vscode.TextDocument | undefined;
+                try {
+                    propertiesDocument = await vscode.workspace.openTextDocument(propertiesUri);
+                } catch (error) {
+                    console.error('Error updating function mode:', error);
+                    vscode.window.showWarningMessage(`Please re-run Scaffold to generate the missing file! File "Properties.sol" not found.`);
+                    return;
+                }
+                
                 const propertiesEditor = await vscode.window.showTextDocument(propertiesDocument);
                 const propertiesText = propertiesDocument.getText();
 
@@ -158,7 +172,9 @@ export function registerTestCommands(
                 if (newMode === Mode.CANARY) { // Find placeholder line and insert canary function just bellow it
                     const propertiesMatch = propertiesText.indexOf('/// AUTO GENERATED CANARIES FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///');
                     if (propertiesMatch === -1) {
-                        throw new Error('Properties.sol is missing the canary placeholder line.');
+                        console.error('Properties.sol is missing the canary placeholder line.');
+                        vscode.window.showWarningMessage(`Please re-run Scaffold to generate the malformed file! File "Properties.sol" is missing the canary placeholder line.`);
+                        return;
                     }
                     const propertiesLine = propertiesText.substring(0, propertiesMatch).split('\n').length - 1;
                     const insertionPosition = new vscode.Position(propertiesLine + 1, 0);
@@ -180,6 +196,12 @@ export function registerTestCommands(
                     }
                 }
                 await propertiesDocument.save();
+
+                // Update recon.json - use jsonPath if available, otherwise fall back to contractName lookup
+                const pathName = fnParams.jsonPath || contractName;
+                await services.reconContractsProvider.updateFunctionConfig(pathName, functionName, {
+                    mode: newMode
+                });
 
                 // Get current document and edit
                 const document = await vscode.workspace.openTextDocument(uri);
