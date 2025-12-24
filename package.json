@@ -471,7 +471,7 @@
     "jsdom": "^26.1.0",
     "prismjs": "^1.30.0",
     "solc-typed-ast": "^18.2.5",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.2"
   },
   "overrides": {
     "tmp": "0.2.4"
