@@ -12,6 +12,10 @@ import {
 } from "../utils";
 import { applyDynamicReplacements } from "../utils/dynamicReplacement";
 import { ServiceContainer } from "../services/serviceContainer";
+import { ToolValidationService } from "../services/toolValidationService";
+import { formatDuration } from "../utils";
+import { filterIgnoredProperties } from "../utils/propertyFilter";
+import { getWorkerConfig } from "../utils/workerConfig";
 
 export function registerFuzzingCommands(
   context: vscode.ExtensionContext,
@@ -61,6 +65,31 @@ async function runFuzzer(
   // Apply dynamic replacements before running fuzzer
   await applyDynamicReplacements();
 
+  // Validate that the fuzzer tool is available (echidna and medusa)
+  let validatedCommand: string | undefined;
+  if (fuzzerType === Fuzzer.ECHIDNA || fuzzerType === Fuzzer.MEDUSA) {
+    const validationService = new ToolValidationService();
+    const fuzzerName = fuzzerType === Fuzzer.ECHIDNA ? "echidna" : "medusa";
+    const validation = await validationService.validateFuzzer(fuzzerName);
+
+    if (!validation.isValid) {
+      const result = await vscode.window.showWarningMessage(
+        validation.error || `${fuzzerName} not found`,
+        "Open Settings",
+        "Cancel"
+      );
+
+      if (result === "Open Settings") {
+        vscode.commands.executeCommand(
+          "workbench.action.openSettings",
+          `recon.${fuzzerName}.path`
+        );
+      }
+      return;
+    }
+    validatedCommand = validation.command;
+  }
+
   const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
   const foundryRoot = path.dirname(foundryConfigPath);
@@ -69,21 +98,23 @@ async function runFuzzer(
 
   if (fuzzerType === Fuzzer.ECHIDNA) {
     const config = vscode.workspace.getConfiguration("recon.echidna");
-    const workers = config.get<number>("workers", 8);
+    // const workers = config.get<number>("workers", 8); prev default, now dynamic
+    const workers = getWorkerConfig("echidna");
     const testLimit = config.get<number>("testLimit", 1000000);
     const mode = config.get<string>("mode", "assertion");
 
-    command = `echidna . --contract ${
+    command = `${validatedCommand || "echidna"} . --contract ${
       target || "CryticTester"
     } --config echidna.yaml --format text --workers ${
       workers || 10
     } --test-limit ${testLimit} --test-mode ${mode}`;
   } else if (fuzzerType === Fuzzer.MEDUSA) {
     const config = vscode.workspace.getConfiguration("recon.medusa");
-    const workers = config.get<number>("workers", 10);
+    // const workers = config.get<number>("workers", 10); prev default, now dynamic
+    const workers = getWorkerConfig("medusa");
     const testLimit = config.get<number>("testLimit", 0);
 
-    command = `medusa fuzz --workers ${
+    command = `${validatedCommand || "medusa"} fuzz --workers ${
       workers || 10
     } --test-limit ${testLimit}`;
     if (target !== "CryticTester") {
@@ -125,12 +156,14 @@ async function runFuzzer(
       cancellable: true,
     },
     async (progress, token) => {
+      const startTime = Date.now();
       return new Promise<void>((resolve, reject) => {
         childProcess = require("child_process").spawn(command, {
           cwd: foundryRoot,
           shell: true,
-          detached: true,
-          ...(process.platform !== "win32" && { stdio: "pipe" }),
+          ...(process.platform === "win32"
+            ? { stdio: "pipe", detached: false }
+            : { stdio: "pipe", detached: true }),
           env: {
             ...process.env,
             PATH: getEnvironmentPath(),
@@ -226,9 +259,12 @@ async function runFuzzer(
                   }
 
                   // Handle broken properties
-                  if (results.brokenProperties.length > 0) {
-                    const repros = results.brokenProperties
-                      .map((prop) =>
+                  const filteredProperties = filterIgnoredProperties(
+                    results.brokenProperties
+                  );
+                  if (filteredProperties.length > 0) {
+                    const repros = filteredProperties
+                      .map((prop: { sequence: string; brokenProperty: string }) =>
                         prepareTrace(
                           fuzzerType,
                           getUid(),
@@ -239,7 +275,7 @@ async function runFuzzer(
                       .join("\n\n");
 
                     const answer = await vscode.window.showInformationMessage(
-                      `Found ${results.brokenProperties.length} broken properties. Save Foundry reproductions?`,
+                      `Found ${filteredProperties.length} broken properties. Save Foundry reproductions?`,
                       { modal: true },
                       "Yes",
                       "No"
@@ -340,8 +376,17 @@ async function runFuzzer(
                   percentage - (progress as any).lastPercentage || 0;
                 (progress as any).lastPercentage = percentage;
 
+                let etaStr = "";
+                if (current > 0) {
+                  const elapsedSeconds = (Date.now() - startTime) / 1000;
+                  const testsPerSecond = current / elapsedSeconds;
+                  const remainingTests = max - current;
+                  const remainingSeconds = remainingTests / testsPerSecond;
+                  etaStr = `ETA: ${formatDuration(remainingSeconds)}`;
+                }
+
                 progress.report({
-                  message: `Tests: ${failedTests}/${totalTests} | Progress: ${currentFuzz}/${maxFuzz} | Corpus: ${corpusSize}`,
+                  message: `Tests: ${etaStr} | ${failedTests}/${totalTests} | Progress: ${currentFuzz}/${maxFuzz} | Corpus: ${corpusSize}`,
                   increment: Math.max(0, increment),
                 });
               }
@@ -355,22 +400,33 @@ async function runFuzzer(
 
               if (corpusMatch && failuresMatch && callsMatch) {
                 const corpus = corpusMatch[1];
-                const [, failures, totalTests] = failuresMatch;
+                const [, failures, totalTestsStr] = failuresMatch;
+                const totalTests = parseInt(totalTestsStr);
                 const calls = callsMatch[1];
-                const testLimit = vscode.workspace
+                const currentCalls = parseInt(calls);
+                let testLimit = vscode.workspace
                   .getConfiguration("recon.medusa")
                   .get<number>("testLimit", 0);
 
                 const percentage =
                   testLimit > 0
-                    ? Math.min((parseInt(calls) / testLimit) * 100, 100)
+                    ? Math.min((currentCalls / testLimit) * 100, 100)
                     : 0;
                 const increment =
                   percentage - (progress as any).lastPercentage || 0;
                 (progress as any).lastPercentage = percentage;
 
+                let etaStr = "";
+                if (testLimit > 0 && currentCalls > 0) {
+                  const elapsedSeconds = (Date.now() - startTime) / 1000;
+                  const callsPerSecond = currentCalls / elapsedSeconds;
+                  const remainingCalls = testLimit - currentCalls;
+                  const remainingSeconds = remainingCalls / callsPerSecond;
+                  etaStr = `ETA: ${formatDuration(remainingSeconds)}`;
+                }
+
                 progress.report({
-                  message: `Tests: ${failures}/${totalTests} | Calls: ${calls} | Corpus: ${corpus}`,
+                  message: `Tests: ${etaStr} | ${failures}/${totalTestsStr} | Calls: ${calls} | Corpus: ${corpus}`,
                   increment: Math.max(0, increment),
                 });
               }
