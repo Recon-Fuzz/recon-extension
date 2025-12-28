@@ -37,7 +37,7 @@ export class SolFileProcessor implements vscode.CodeLensProvider {
             // Add target function CodeLenses
             for (const func of targetFunctions) {
                 const config = enabledContracts
-                    .find(c => c.name === func.contractName)
+                    .find(c => c.jsonPath === func.fnParams.jsonPath)
                     ?.functionConfigs?.find(f => {
                         const [funcName] = f.signature.split('(');
                         return funcName === func.name;
@@ -168,6 +168,7 @@ export class SolFileProcessor implements vscode.CodeLensProvider {
                                 fnParams: {
                                     contractName: matchingContract.name,
                                     contractPath: matchingContract.path,
+                                    jsonPath: matchingContract.jsonPath,
                                     functionName: actualFunctionName,
                                     abi: functionAbi,
                                     actor: functionConfig.actor,

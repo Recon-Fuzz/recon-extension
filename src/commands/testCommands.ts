@@ -48,8 +48,9 @@ export function registerTestCommands(
             if (!vscode.workspace.workspaceFolders) { return; }
 
             try {
-                // Update recon.json
-                await services.reconContractsProvider.updateFunctionConfig(contractName, functionName, {
+                // Update recon.json - use jsonPath if available, otherwise fall back to contractName lookup
+                const pathName = fnParams.jsonPath || contractName;
+                await services.reconContractsProvider.updateFunctionConfig(pathName, functionName, {
                     actor
                 });
 
@@ -90,8 +91,9 @@ export function registerTestCommands(
             if (!vscode.workspace.workspaceFolders) { return; }
 
             try {
-                // Update recon.json
-                await services.reconContractsProvider.updateFunctionConfig(contractName, functionName, {
+                // Update recon.json - use jsonPath if available, otherwise fall back to contractName lookup
+                const pathName = fnParams.jsonPath || contractName;
+                await services.reconContractsProvider.updateFunctionConfig(pathName, functionName, {
                     mode
                 });
 

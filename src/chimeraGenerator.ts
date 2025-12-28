@@ -112,7 +112,7 @@ export class ChimeraGenerator {
         } catch {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
-                exec('forge install Recon-Fuzz/chimera --no-git',
+                exec('forge install Recon-Fuzz/chimera',
                     { 
                         cwd: foundryRoot,
                         env: {
@@ -135,7 +135,7 @@ export class ChimeraGenerator {
         } catch {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
-                exec('forge install Recon-Fuzz/setup-helpers --no-git',
+                exec('forge install Recon-Fuzz/setup-helpers',
                     { 
                         cwd: foundryRoot,
                         env: {

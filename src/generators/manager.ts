@@ -117,6 +117,7 @@ export class TemplateManager {
                     const functionInfo: FunctionDefinitionParams = {
                         contractName: contract.name,
                         contractPath: contract.path,
+                        jsonPath: contract.jsonPath,
                         functionName: functionAbi.name,
                         abi: functionAbi,
                         actor: functionConfig.actor || Actor.ACTOR,

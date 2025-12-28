@@ -124,9 +124,8 @@ async function runFuzzer(
     const config = vscode.workspace.getConfiguration("recon.halmos");
     const loop = config.get<number>("loop", 256);
 
-    command = `halmos --match-contract ${
-      target || "CryticTester"
-    } -vv --solver-timeout-assertion 0 --loop ${loop} `;
+    command = `halmos --match-contract ${target || "CryticTester"
+      } -vv --solver-timeout-assertion 0 --loop ${loop} `;
   }
 
   // Create output channel for live feedback
@@ -134,8 +133,8 @@ async function runFuzzer(
     fuzzerType === Fuzzer.ECHIDNA
       ? "Echidna"
       : fuzzerType === Fuzzer.MEDUSA
-      ? "Medusa"
-      : "Halmos"
+        ? "Medusa"
+        : "Halmos"
   );
   outputChannel.show();
 
@@ -151,8 +150,8 @@ async function runFuzzer(
         fuzzerType === Fuzzer.ECHIDNA
           ? "Echidna"
           : fuzzerType === Fuzzer.MEDUSA
-          ? "Medusa"
-          : "Halmos",
+            ? "Medusa"
+            : "Halmos",
       cancellable: true,
     },
     async (progress, token) => {

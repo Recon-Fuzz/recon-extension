@@ -289,6 +289,23 @@ export function getEnvironmentPath(): string {
     return Array.from(combined).join(':');
 }
 
+export async function checkCommandExists(command: string): Promise<boolean> {
+    try {
+        const checkCommand = process.platform === 'win32' ? 'where' : 'which';
+        execSync(`${checkCommand} ${command}`, {
+            encoding: 'utf-8',
+            stdio: 'pipe',
+            env: {
+                ...process.env,
+                PATH: getEnvironmentPath()
+            },
+        });
+       return true; 
+    } catch (error) {
+       return false; 
+    }
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds <= 0) {
     return "0s";

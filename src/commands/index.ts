@@ -6,7 +6,9 @@ import { registerCoverageCommands } from './coverageCommands';
 import { registerMockCommands } from './mockCommands';
 import { registerTestCommands } from './testCommands';
 import { registerLibraryCommands } from './libraryCommands';
+import { registerWorkerCommands } from './workerCommands';
 import { ServiceContainer } from '../services/serviceContainer';
+
 
 export async function registerCommands(
     context: vscode.ExtensionContext,
@@ -20,4 +22,5 @@ export async function registerCommands(
     registerMockCommands(context, services);
     registerTestCommands(context, services);
     registerLibraryCommands(context, services);
+    registerWorkerCommands(context, services);
 }

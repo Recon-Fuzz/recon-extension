@@ -294,6 +294,21 @@
         "title": "Forge Build (with build-info)",
         "category": "Recon",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "recon.configureReservedCores",
+        "title": "Configure Reserved CPU Cores",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.showWorkerInfo",
+        "title": "Show Worker Configuration Info",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.resetWorkersToAuto",
+        "title": "Reset Workers to Auto-Detection",
+        "category": "Recon"
       }
     ],
     "configuration": {
@@ -311,17 +326,43 @@
           "description": "Default fuzzing tool to use",
           "order": 1
         },
+        "recon.reservedCores": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 16,
+          "scope": "resource",
+          "order": 2,
+          "description": "Number of CPU cores to reserve for system/IDE (prevents freezing)"
+        },
+        "recon.uncapWorkers": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "order": 3,
+          "markdownDescription": "**Maximum Performance Mode (Uncap Automatic Workers)**\n\nRemoves automatic worker count limits for Echidna (8) and Medusa (12).\n\n**Warning:** Diminishing returns beyond recommended caps. May cause system instability.\n\nUse case:\n- Overnight fuzzing campaigns\n- Dedicated fuzzing machines\n- High-core count systems (16+ cores)"
+        },
         "recon.showAllFiles": {
           "type": "boolean",
           "default": false,
           "scope": "resource",
-          "order": 2,
+          "order": 4,
           "description": "Show all contract files including tests and libraries"
+        },
+        "recon.ignorePropertyPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["canary_*"],
+          "scope": "resource",
+          "order": 3,
+          "description": "Glob patterns to filter out properties (e.g., canary_*)"
         },
         "recon.echidna.mode": {
           "type": "string",
           "scope": "resource",
-          "order": 3,
+          "order": 5,
           "default": "assertion",
           "enum": [
             "property",
@@ -337,39 +378,73 @@
           "default": 1000000,
           "minimum": 1,
           "scope": "resource",
-          "order": 4,
+          "order": 6,
           "description": "Test limit for Echidna fuzzing"
         },
         "recon.echidna.workers": {
-          "type": "number",
-          "default": 8,
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
           "minimum": 1,
           "scope": "resource",
-          "order": 5,
-          "description": "Number of workers for Echidna fuzzing"
+          "order": 7,
+          "description": "Number of workers for Echidna fuzzing (auto-detected based on CPU cores if not set)"
+        },
+        "recon.echidna.workersOverride": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "order": 8,
+          "description": "When true, prevents automatic worker count adjustment"
+        },
+        "recon.echidna.path": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "order": 9,
+          "description": "Custom path to echidna binary (optional, uses PATH if empty)"
         },
         "recon.medusa.testLimit": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "scope": "resource",
-          "order": 6,
+          "order": 10,
           "description": "Test limit for Medusa fuzzing"
         },
         "recon.medusa.workers": {
-          "type": "number",
-          "default": 10,
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
           "minimum": 1,
           "scope": "resource",
-          "order": 7,
-          "description": "Number of workers for Medusa fuzzing"
+          "order": 11,
+          "description": "Number of workers for Medusa fuzzing (auto-detected based on CPU cores if not set)"
+        },
+        "recon.medusa.workersOverride": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "order": 12,
+          "description": "When true, prevents automatic worker count adjustment"
+        },
+        "recon.medusa.path": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "order": 13,
+          "description": "Custom path to medusa binary (optional, uses PATH if empty)"
         },
         "recon.halmos.depth": {
           "type": "number",
           "default": 22,
           "minimum": 1,
           "scope": "resource",
-          "order": 8,
+          "order": 14,
           "description": "Maximum call depth for Halmos symbolic execution"
         },
         "recon.halmos.unroll": {
@@ -377,7 +452,7 @@
           "default": 256,
           "minimum": 1,
           "scope": "resource",
-          "order": 9,
+          "order": 15,
           "description": "Maximum loop unrolling factor for Halmos"
         },
         "recon.halmos.solver": {
@@ -390,7 +465,7 @@
             "bitwuzla",
             "yices"
           ],
-          "order": 10,
+          "order": 16,
           "description": "SMT solver to use for Halmos symbolic execution"
         },
         "recon.foundryConfigPath": {
@@ -398,14 +473,14 @@
           "default": "foundry.toml",
           "description": "Path to foundry.toml configuration file (relative to workspace root)",
           "scope": "resource",
-          "order": 11
+          "order": 17
         },
         "recon.forge.buildArgs": {
           "type": "string",
           "default": "",
           "description": "Extra arguments to pass to forge build command (e.g. --via-ir)",
           "scope": "resource",
-          "order": 12
+          "order": 18
         },
         "recon.forge.testVerbosity": {
           "type": "string",
@@ -419,28 +494,28 @@
           ],
           "description": "Verbosity level for forge test command",
           "scope": "resource",
-          "order": 13
+          "order": 19
         },
         "recon.mocksFolderPath": {
           "type": "string",
           "default": "test/recon/mocks",
           "description": "Path to store generated mock contracts (relative to foundry.toml location)",
           "scope": "resource",
-          "order": 14
+          "order": 20
         },
         "recon.mockAutoSave": {
           "type": "boolean",
           "default": true,
           "description": "Automatically save generated mock contracts to disk",
           "scope": "resource",
-          "order": 15
+          "order": 21
         },
         "recon.customTestFolderPath": {
           "type": "string",
           "default": "",
           "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
           "scope": "resource",
-          "order": 16
+          "order": 22
         }
       }
     }
@@ -471,7 +546,7 @@
     "@recon-fuzz/log-parser": "^0.0.38",
     "@solidity-parser/parser": "^0.20.1",
     "@types/prismjs": "^1.26.5",
-    "@vscode/codicons": "^0.0.39",
+    "@vscode/codicons": "^0.0.41",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "abi-to-mock": "^1.0.11",
     "case": "^1.6.3",
@@ -480,7 +555,7 @@
     "html2canvas": "^1.4.1",
     "jsdom": "^26.1.0",
     "prismjs": "^1.30.0",
-    "solc-typed-ast": "^18.2.5",
+    "solc-typed-ast": "^18.2.6",
     "yaml": "^2.8.0"
   },
   "overrides": {

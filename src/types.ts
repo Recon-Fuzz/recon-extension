@@ -78,6 +78,7 @@ export interface TestFunction {
 export interface FunctionDefinitionParams {
     contractName: string;
     contractPath: string;
+    jsonPath?: string; 
     functionName: string;
     abi: Abi;
     actor: Actor;

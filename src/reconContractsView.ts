@@ -31,7 +31,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
 
         vscode.commands.executeCommand('setContext', 'recon.showingAllFiles', this.showAllFiles);
 
-        this.contracts.forEach(c => this.collapsedContracts.add(c.name));
+        this.contracts.forEach(c => this.collapsedContracts.add(c.jsonPath));
         this.startWatchingReconJson();
     }
 
@@ -187,13 +187,13 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         // Don't update the entire webview, let the client-side filter handle it
                         break;
                     case 'toggleContract':
-                        const contract = this.contracts.find(c => c.name === message.contractName);
+                        const contract = this.contracts.find(c => c.jsonPath === message.pathName);
                         if (contract) {
                             this.toggleContract(contract, message.enabled);
                         }
                         break;
                     case 'toggleFunction':
-                        const contract2 = this.contracts.find(c => c.name === message.contractName);
+                        const contract2 = this.contracts.find(c => c.jsonPath === message.pathName);
                         if (contract2) {
                             if (!contract2.enabledFunctions) {
                                 contract2.enabledFunctions = [];
@@ -234,25 +234,25 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                         break;
                     case 'toggleCollapse':
-                        if (this.collapsedContracts.has(message.contractName)) {
-                            this.collapsedContracts.delete(message.contractName);
+                        if (this.collapsedContracts.has(message.pathName)) {
+                            this.collapsedContracts.delete(message.pathName);
                         } else {
-                            this.collapsedContracts.add(message.contractName);
+                            this.collapsedContracts.add(message.pathName);
                         }
 
                         // Only update the collapsed state without full rerender
                         if (this._view) {
                             this._view.webview.postMessage({
                                 type: 'updatedCollapsedState',
-                                contractName: message.contractName,
-                                collapsed: this.collapsedContracts.has(message.contractName)
+                                pathName: message.pathName,
+                                collapsed: this.collapsedContracts.has(message.pathName)
                             });
                             return;
                         }
                         break;
                     case 'updateFunctionMode':
                     case 'updateFunctionActor':
-                        const contract3 = this.contracts.find(c => c.name === message.contractName);
+                        const contract3 = this.contracts.find(c => c.jsonPath === message.pathName);
                         if (contract3) {
                             if (!contract3.functionConfigs) {
                                 contract3.functionConfigs = [];
@@ -278,7 +278,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
                                     type: 'updateSuccess',
-                                    contractName: message.contractName,
+                                    pathName: message.pathName,
                                     functionName: message.functionName,
                                     property: message.type === 'updateFunctionMode' ? 'mode' : 'actor',
                                     value: message.type === 'updateFunctionMode' ? message.mode : message.actor
@@ -297,7 +297,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                         break;
                     case 'toggleContractSeparated':
-                        const contract4 = this.contracts.find(c => c.name === message.contractName);
+                        const contract4 = this.contracts.find(c => c.jsonPath === message.pathName);
                         if (contract4) {
                             contract4.separated = message.separated;
                             await this.saveState();
@@ -306,7 +306,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
                                     type: 'updateSuccess',
-                                    contractName: message.contractName,
+                                    pathName: message.pathName,
                                     property: 'separated',
                                     value: message.separated
                                 });
@@ -317,12 +317,13 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     case 'getContractState':
                         // Send the current state of a specific contract to the client
                         if (this._view) {
-                            const contract = this.contracts.find(c => c.name === message.contractName);
+                            const contract = this.contracts.find(c => c.jsonPath === message.pathName);
                             if (contract) {
                                 this._view.webview.postMessage({
                                     type: 'contractState',
                                     contract: {
                                         name: contract.name,
+                                        jsonPath: contract.jsonPath,
                                         enabled: contract.enabled,
                                         path: contract.path,
                                         separated: contract.separated,
@@ -334,7 +335,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                         break;
                     case 'batchUpdateFunctions':
-                        const contract5 = this.contracts.find(c => c.name === message.contractName);
+                        const contract5 = this.contracts.find(c => c.jsonPath === message.pathName);
                         if (contract5) {
                             // Update multiple functions at once
                             if (message.enabledFunctions) {
@@ -348,7 +349,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             if (message.clientUpdate && this._view) {
                                 this._view.webview.postMessage({
                                     type: 'batchUpdateSuccess',
-                                    contractName: message.contractName
+                                    pathName: message.pathName
                                 });
                                 return;
                             }
@@ -382,7 +383,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'contractToggled',
-                contractName: contract.name,
+                pathName: contract.jsonPath,
                 enabled: contract.enabled,
                 enabledFunctions: contract.enabledFunctions,
                 functionConfigs: contract.functionConfigs
@@ -806,10 +807,10 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         const message = event.data;
                         switch (message.type) {
                             case 'updatedCollapsedState':
-                                updateCollapsedState(message.contractName, message.collapsed);
+                                updateCollapsedState(message.pathName, message.collapsed);
                                 break;
                             case 'contractToggled':
-                                updateContractState(message.contractName, message.enabled, message.enabledFunctions, message.functionConfigs);
+                                updateContractState(message.pathName, message.enabled, message.enabledFunctions, message.functionConfigs);
                                 break;
                             case 'updateSuccess':
                                 handleUpdateSuccess(message);
@@ -826,13 +827,13 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     // Handle successful update response
                     function handleUpdateSuccess(message) {
                         // Update client-side state
-                        if (!state.contractStates[message.contractName]) {
-                            state.contractStates[message.contractName] = {};
+                        if (!state.contractStates[message.pathName]) {
+                            state.contractStates[message.pathName] = {};
                         }
                         
                         if (message.functionName) {
                             // Update function-specific property
-                            const functionConfig = state.contractStates[message.contractName].functionConfigs?.find(
+                            const functionConfig = state.contractStates[message.pathName].functionConfigs?.find(
                                 f => f.signature === message.functionName
                             );
                             if (functionConfig) {
@@ -840,7 +841,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                             }
                         } else {
                             // Update contract-level property
-                            state.contractStates[message.contractName][message.property] = message.value;
+                            state.contractStates[message.pathName][message.property] = message.value;
                         }
                         
                         vscode.setState(state);
@@ -865,17 +866,17 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
 
                     // Cache contract states for client-side rendering
                     function updateContractStateFromServer(contract) {
-                        state.contractStates[contract.name] = contract;
+                        state.contractStates[contract.jsonPath] = contract;
                         vscode.setState(state);
                     }
 
                     // Update contract state in UI without full rerender
-                    function updateContractState(contractName, enabled, enabledFunctions, functionConfigs) {
-                        const contractDiv = document.querySelector(\`[data-contract="\${contractName}"]\`);
+                    function updateContractState(pathName, enabled, enabledFunctions, functionConfigs) {
+                        const contractDiv = document.querySelector(\`[data-path-name="\${pathName}"]\`);
                         if (!contractDiv) return;
                         
                         // Update checkbox state
-                        const checkbox = contractDiv.querySelector(\`#contract-\${contractName}\`);
+                        const checkbox = contractDiv.querySelector(\`#contract-\${pathName}\`);
                         if (checkbox) checkbox.checked = enabled;
                         
                         // Update functions list visibility
@@ -883,7 +884,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         if (enabled) {
                             if (functionsList) {
                                 // Render functions if contract is now enabled
-                                renderFunctions(contractName, enabledFunctions, functionConfigs);
+                                renderFunctions(pathName, enabledFunctions, functionConfigs);
                                 
                                 // Show separated checkbox if needed
                                 const separatedCheckboxContainer = contractDiv.querySelector('.contract-separated-checkbox');
@@ -891,10 +892,10 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                     const titleDiv = contractDiv.querySelector('.contract-title');
                                     const separatedCheckbox = document.createElement('vscode-checkbox');
                                     separatedCheckbox.className = 'contract-separated-checkbox';
-                                    separatedCheckbox.id = \`contract-separated-\${contractName}\`;
+                                    separatedCheckbox.id = \`contract-separated-\${pathName}\`;
                                     separatedCheckbox.checked = true; // Default to true
                                     separatedCheckbox.innerHTML = 'Separated';
-                                    separatedCheckbox.setAttribute('onchange', \`toggleContractSeparated('\${contractName}', this.checked, true)\`);
+                                    separatedCheckbox.setAttribute('onchange', \`toggleContractSeparated('\${pathName}', this.checked, true)\`);
                                     titleDiv.appendChild(separatedCheckbox);
                                 }
                             }
@@ -904,7 +905,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 functionsList.innerHTML = '';
                             }
                             // Remove separated checkbox
-                            const separatedCheckbox = contractDiv.querySelector(\`#contract-separated-\${contractName}\`);
+                            const separatedCheckbox = contractDiv.querySelector(\`#contract-separated-\${pathName}\`);
                             if (separatedCheckbox) {
                                 const parent = separatedCheckbox.parentElement;
                                 parent.removeChild(parent.querySelector('.contract-separated-checkbox'));
@@ -912,18 +913,18 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         }
                         
                         // Update local state
-                        if (!state.contractStates[contractName]) {
-                            state.contractStates[contractName] = {};
+                        if (!state.contractStates[pathName]) {
+                            state.contractStates[pathName] = {};
                         }
-                        state.contractStates[contractName].enabled = enabled;
-                        state.contractStates[contractName].enabledFunctions = enabledFunctions;
-                        state.contractStates[contractName].functionConfigs = functionConfigs;
+                        state.contractStates[pathName].enabled = enabled;
+                        state.contractStates[pathName].enabledFunctions = enabledFunctions;
+                        state.contractStates[pathName].functionConfigs = functionConfigs;
                         vscode.setState(state);
                     }
                     
                     // Render or re-render functions for a contract
-                    function renderFunctions(contractName, enabledFunctions, functionConfigs) {
-                        const functionsList = document.querySelector(\`[data-contract="\${contractName}"] .functions-list\`);
+                    function renderFunctions(pathName, enabledFunctions, functionConfigs) {
+                        const functionsList = document.querySelector(\`[data-path-name="\${pathName}"] .functions-list\`);
                         if (!functionsList) return;
                         
                         // Get all function checkboxes and their data
@@ -1022,7 +1023,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     }
                     
                     // Update function setting with optimized radio buttons
-                    function updateFunctionSetting(contractName, functionName, settingType, value, element) {
+                    function updateFunctionSetting(pathName, functionName, settingType, value, element) {
                         // Show saving indicator
                         showSavingIndicator();
                         
@@ -1033,7 +1034,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         // Then send to extension with client update flag
                         vscode.postMessage({
                             type: settingType === 'mode' ? 'updateFunctionMode' : 'updateFunctionActor',
-                            contractName,
+                            pathName,
                             functionName,
                             [settingType]: value,
                             clientUpdate: true
@@ -1041,8 +1042,8 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     }
                     
                     // Function to update collapsed state without refresh
-                    function updateCollapsedState(contractName, collapsed) {
-                        const contractDiv = document.querySelector(\`[data-contract="\${contractName}"]\`);
+                    function updateCollapsedState(pathName, collapsed) {
+                        const contractDiv = document.querySelector(\`[data-path-name="\${pathName}"]\`);
                         if (!contractDiv) return;
                         
                         const button = contractDiv.querySelector('.toggle-button .codicon');
@@ -1065,11 +1066,11 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     }
 
                     // Optimized version of toggle contract function
-                    function toggleContract(name, enabled) {
+                    function toggleContract(pathName, enabled) {
                         showSavingIndicator();
                         vscode.postMessage({
                             type: 'toggleContract',
-                            contractName: name,
+                            pathName: pathName,
                             enabled: enabled
                         });
                     }
@@ -1218,24 +1219,24 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         filterContracts(query);
                     }
 
-                    function toggleFunction(contractName, functionName, enabled) {
+                    function toggleFunction(pathName, functionName, enabled) {
                         vscode.postMessage({
                             type: 'toggleFunction',
-                            contractName,
+                            pathName,
                             functionName,
                             enabled
                         });
                     }
 
-                    function toggleAllFunctions(contractName, checked) {
-                        document.querySelectorAll(\`[data-contract="\${contractName}"] .function-checkbox\`).forEach(checkbox => {
+                    function toggleAllFunctions(pathName, checked) {
+                        document.querySelectorAll(\`[data-path-name="\${pathName}"] .function-checkbox\`).forEach(checkbox => {
                             checkbox.checked = checked;
-                            toggleFunction(contractName, checkbox.dataset.function, checked);
+                            toggleFunction(pathName, checkbox.dataset.function, checked);
                         });
                     }
 
-                    function toggleCollapse(contractName) {
-                        const contractDiv = document.querySelector(\`[data-contract="\${contractName}"]\`);
+                    function toggleCollapse(pathName) {
+                        const contractDiv = document.querySelector(\`[data-path-name="\${pathName}"]\`);
                         const button = contractDiv.querySelector('.toggle-button .codicon');
                         
                         if (button.classList.contains('codicon-chevron-right')) {
@@ -1246,56 +1247,56 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         
                         vscode.postMessage({
                             type: 'toggleCollapse',
-                            contractName: contractName
+                            pathName: pathName
                         });
                     }
 
-                    function updateFunctionMode(contractName, functionName, mode) {
+                    function updateFunctionMode(pathName, functionName, mode) {
                         vscode.postMessage({
                             type: 'updateFunctionMode',
-                            contractName,
+                            pathName,
                             functionName,
                             mode: mode || 'default'
                         });
                         // Update radio button state directly
                         const radioGroup = document.querySelector(
-                            \`[data-contract="\${contractName}"] [data-function="\${functionName}"] vscode-radio-group[data-type="mode"]\`
+                            \`[data-path-name="\${pathName}"] [data-function="\${functionName}"] vscode-radio-group[data-type="mode"]\`
                         );
                         if (radioGroup) {
                             radioGroup.value = mode;
                         }
                     }
 
-                    function updateFunctionActor(contractName, functionName, actor) {
+                    function updateFunctionActor(pathName, functionName, actor) {
                         vscode.postMessage({
                             type: 'updateFunctionActor',
-                            contractName,
+                            pathName,
                             functionName,
                             actor
                         });
                         // Update radio button state directly
                         const radioGroup = document.querySelector(
-                            \`[data-contract="\${contractName}"] [data-function="\${functionName}"] vscode-radio-group[data-type="actor"]\`
+                            \`[data-path-name="\${pathName}"] [data-function="\${functionName}"] vscode-radio-group[data-type="actor"]\`
                         );
                         if (radioGroup) {
                             radioGroup.value = actor;
                         }
                     }
 
-                    function toggleContractSeparated(name, checked, clientUpdate = false) {
+                    function toggleContractSeparated(pathName, checked, clientUpdate = false) {
                         if (clientUpdate) {
                             showSavingIndicator();
                         }
                         
                         // Update client-side state if available
-                        if (state.contractStates[name]) {
-                            state.contractStates[name].separated = checked;
+                        if (state.contractStates[pathName]) {
+                            state.contractStates[pathName].separated = checked;
                             vscode.setState(state);
                         }
                         
                         vscode.postMessage({
                             type: 'toggleContractSeparated',
-                            contractName: name,
+                            pathName: pathName,
                             separated: checked,
                             clientUpdate
                         });
@@ -1395,28 +1396,28 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
     private renderContractItem(contract: ContractMetadata, index: number, array: ContractMetadata[]): string {
         return `
             <div class="contract-group">
-                <div class="contract-item" data-contract="${contract.name}" data-name="${contract.name}" data-path="${contract.path}">
+                <div class="contract-item" data-path-name="${contract.jsonPath}" data-name="${contract.name}" data-path="${contract.path}">
                     <div class="contract-header">
                         <div class="contract-title">
                             ${contract.enabled ? `
-                                <button class="toggle-button" onclick="toggleCollapse('${contract.name}')">
-                                    <i class="codicon ${this.collapsedContracts.has(contract.name) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
+                                <button class="toggle-button" onclick="toggleCollapse('${contract.jsonPath}')">
+                                    <i class="codicon ${this.collapsedContracts.has(contract.jsonPath) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
                                 </button>
                             ` : ''}
                             <vscode-checkbox
                                 class="contract-checkbox"
-                                id="contract-${contract.name}"
+                                id="contract-${contract.jsonPath}"
                                 ${contract.enabled ? 'checked' : ''}
-                                onchange="toggleContract('${contract.name}', this.checked)"
+                                onchange="toggleContract('${contract.jsonPath}', this.checked)"
                             >
                                 <span class="contract-name">${contract.name}</span>
                             </vscode-checkbox>
                             ${contract.enabled ? `
                                 <vscode-checkbox
                                     class="contract-separated-checkbox"
-                                    id="contract-separated-${contract.name}"
+                                    id="contract-separated-${contract.jsonPath}"
                                     ${contract.separated !== false ? 'checked' : ''}
-                                    onchange="toggleContractSeparated('${contract.name}', this.checked)"
+                                    onchange="toggleContractSeparated('${contract.jsonPath}', this.checked)"
                                 >
                                     Separated
                                 </vscode-checkbox>
@@ -1425,7 +1426,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         <div class="contract-path" data-path="${contract.path}">${contract.path}</div>
                     </div>
                     ${contract.enabled ? `
-                        <div class="functions-list ${this.collapsedContracts.has(contract.name) ? 'collapsed' : ''}">
+                        <div class="functions-list ${this.collapsedContracts.has(contract.jsonPath) ? 'collapsed' : ''}">
                             ${this.getFunctionsHtml(contract)}
                         </div>
                     ` : ''}
@@ -1460,7 +1461,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                     class="function-checkbox"
                                     data-function="${signature}"
                                     ${isEnabled ? 'checked' : ''}
-                                    onchange="toggleFunction('${contract.name}', '${signature}', this.checked)"
+                                    onchange="toggleFunction('${contract.jsonPath}', '${signature}', this.checked)"
                                 >
                                     <span class="function-name" title="${signature}">${signature}</span>
                                 </vscode-checkbox>
@@ -1472,21 +1473,21 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                             <span class="optimized-radio">
                                                 <label class="radio-label ${config.mode === Mode.NORMAL ? 'selected' : ''}" 
                                                        data-value="normal" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'normal', this)">
+                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'normal', this)">
                                                     Normal
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
                                                 <label class="radio-label ${config.mode === Mode.FAIL ? 'selected' : ''}" 
                                                        data-value="fail" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'fail', this)">
+                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'fail', this)">
                                                     Fail
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
                                                 <label class="radio-label ${config.mode === Mode.CATCH ? 'selected' : ''}" 
                                                        data-value="catch" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'catch', this)">
+                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'catch', this)">
                                                     Catch
                                                 </label>
                                             </span>
@@ -1495,14 +1496,14 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                             <span class="optimized-radio">
                                                 <label class="radio-label ${config.actor === Actor.ACTOR ? 'selected' : ''}" 
                                                        data-value="actor" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'actor', 'actor', this)">
+                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'actor', 'actor', this)">
                                                     Actor
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
                                                 <label class="radio-label ${config.actor === Actor.ADMIN ? 'selected' : ''}" 
                                                        data-value="admin" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'actor', 'admin', this)">
+                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'actor', 'admin', this)">
                                                     Admin
                                                 </label>
                                             </span>
@@ -1557,8 +1558,8 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
         return this.contracts.filter(c => c.enabled);
     }
 
-    public async updateFunctionConfig(contractName: string, functionName: string, update: { actor?: Actor, mode?: Mode }): Promise<void> {
-        const contract = this.contracts.find(c => c.name === contractName);
+    public async updateFunctionConfig(pathName: string, functionName: string, update: { actor?: Actor, mode?: Mode }): Promise<void> {
+        const contract = this.contracts.find(c => c.jsonPath === pathName);
         if (!contract || !contract.functionConfigs) { return; }
 
         const config = contract.functionConfigs.find(f => {
