@@ -8,6 +8,7 @@ export enum Actor {
 export enum Mode {
     NORMAL = 'normal',
     FAIL = 'fail',
+    CANARY = 'canary',
     CATCH = 'catch'
 }
 

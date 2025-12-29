@@ -17,12 +17,15 @@ import {AssetManager} from "@recon/AssetManager.sol";
 // Helpers
 import {Utils} from "@recon/Utils.sol";
 
+// Canaries
+import "./CanaryStorage.sol";
+
 // Your deps
 {{#each contracts}}
 import "{{this.path}}";
 {{/each}}
 
-abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils {
+abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils, CanaryStorage {
     {{#each contracts}}
     {{this.name}} {{camel this.name}};
     {{/each}}

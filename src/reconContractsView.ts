@@ -1485,6 +1485,13 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
+                                                <label class="radio-label ${config.mode === Mode.CANARY ? 'selected' : ''}" 
+                                                       data-value="canary" 
+                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'canary', this)">
+                                                    Canary
+                                                </label>
+                                            </span>
+                                            <span class="optimized-radio">
                                                 <label class="radio-label ${config.mode === Mode.CATCH ? 'selected' : ''}" 
                                                        data-value="catch" 
                                                        onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'catch', this)">

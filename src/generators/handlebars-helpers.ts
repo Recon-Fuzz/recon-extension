@@ -124,7 +124,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
                 : "";
 
 
-        if (mode === Mode.NORMAL || mode === Mode.FAIL) {
+        if (mode === Mode.NORMAL || mode === Mode.FAIL || mode === Mode.CANARY) {
             return `
     function ${contractName}_${abi.name}(${abi.inputs
                     .map(
@@ -139,6 +139,9 @@ export function registerHelpers(handlebars: typeof Handlebars) {
                         ? `
         t(false, "${contractName}_${abi.name}");`
                         : ""
+                }${mode === Mode.CANARY ? `
+        ${abi.name}Canary = true;`
+                        :""
                 }
     }`;
         } else {
@@ -165,6 +168,21 @@ export function registerHelpers(handlebars: typeof Handlebars) {
       ${hasOutputs ? "  " : "  "}}
     }`;
         }
+    });
+
+    handlebars.registerHelper('canaryFunctionDefinition', function ({ contractName, abi }) {
+        contractName = camel(contractName);
+
+        return `
+    function canary_${contractName}_${abi.name}(${abi.inputs
+                    .map(
+                        (input: ParamDefinition) =>
+                            `${conditionallyAddMemoryLocation(input.type, extractType(input))} ${input.name
+                            }`
+                    )
+                    .join(", ")}) public {
+        t(!${abi.name}Canary, "canary_${contractName}_${abi.name}");
+    }`;
     });
 }
 

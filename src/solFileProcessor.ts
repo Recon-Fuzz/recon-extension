@@ -49,21 +49,28 @@ export class SolFileProcessor implements vscode.CodeLensProvider {
                         new vscode.CodeLens(func.range, {
                             title: `⚫ ${config.mode === Mode.NORMAL ? '✓' : ''} Normal Mode`,
                             command: 'recon.setFunctionMode',
-                            arguments: [document.uri, func.contractName, func.name, 'normal', func.range, func.fnParams]
+                            arguments: [document.uri, func.contractName, func.name, {oldMode: config.mode, newMode: Mode.NORMAL}, func.range, func.fnParams]
                         })
                     );
                     codeLenses.push(
                         new vscode.CodeLens(func.range, {
                             title: `🔴 ${config.mode === Mode.FAIL ? '✓' : ''} Fail Mode`,
                             command: 'recon.setFunctionMode',
-                            arguments: [document.uri, func.contractName, func.name, Mode.FAIL, func.range, func.fnParams]
+                            arguments: [document.uri, func.contractName, func.name, {oldMode: config.mode, newMode: Mode.FAIL}, func.range, func.fnParams]
+                        })
+                    );
+                    codeLenses.push(
+                        new vscode.CodeLens(func.range, {
+                            title: `🐥 ${config.mode === Mode.CANARY ? '✓' : ''} Canary Mode`,
+                            command: 'recon.setFunctionMode',
+                            arguments: [document.uri, func.contractName, func.name, {oldMode: config.mode, newMode: Mode.CANARY}, func.range, func.fnParams]
                         })
                     );
                     codeLenses.push(
                         new vscode.CodeLens(func.range, {
                             title: `🟡 ${config.mode === Mode.CATCH ? '✓' : ''} Catch Mode`,
                             command: 'recon.setFunctionMode',
-                            arguments: [document.uri, func.contractName, func.name, Mode.CATCH, func.range, func.fnParams]
+                            arguments: [document.uri, func.contractName, func.name, {oldMode: config.mode, newMode: Mode.CATCH}, func.range, func.fnParams]
                         })
                     );
 
