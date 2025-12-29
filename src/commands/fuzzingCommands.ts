@@ -10,11 +10,12 @@ import {
   getUid,
   getEnvironmentPath,
 } from "../utils";
+import { applyDynamicReplacements } from "../utils/dynamicReplacement";
 import { ServiceContainer } from "../services/serviceContainer";
 import { ToolValidationService } from "../services/toolValidationService";
 import { formatDuration } from "../utils";
 import { filterIgnoredProperties } from "../utils/propertyFilter";
-import { getWorkerConfig } from "../utils/workerConfig"
+import { getWorkerConfig } from "../utils/workerConfig";
 
 export function registerFuzzingCommands(
   context: vscode.ExtensionContext,
@@ -61,6 +62,9 @@ async function runFuzzer(
     return;
   }
 
+  // Apply dynamic replacements before running fuzzer
+  await applyDynamicReplacements();
+
   // Validate that the fuzzer tool is available (echidna and medusa)
   let validatedCommand: string | undefined;
   if (fuzzerType === Fuzzer.ECHIDNA || fuzzerType === Fuzzer.MEDUSA) {
@@ -95,7 +99,7 @@ async function runFuzzer(
   if (fuzzerType === Fuzzer.ECHIDNA) {
     const config = vscode.workspace.getConfiguration("recon.echidna");
     // const workers = config.get<number>("workers", 8); prev default, now dynamic
-    const workers = getWorkerConfig('echidna');
+    const workers = getWorkerConfig("echidna");
     const testLimit = config.get<number>("testLimit", 1000000);
     const mode = config.get<string>("mode", "assertion");
 
@@ -107,7 +111,7 @@ async function runFuzzer(
   } else if (fuzzerType === Fuzzer.MEDUSA) {
     const config = vscode.workspace.getConfiguration("recon.medusa");
     // const workers = config.get<number>("workers", 10); prev default, now dynamic
-    const workers = getWorkerConfig('medusa');
+    const workers = getWorkerConfig("medusa");
     const testLimit = config.get<number>("testLimit", 0);
 
     command = `${validatedCommand || "medusa"} fuzz --workers ${
@@ -156,7 +160,7 @@ async function runFuzzer(
         childProcess = require("child_process").spawn(command, {
           cwd: foundryRoot,
           shell: true,
-          ...(process.platform === "win32" 
+          ...(process.platform === "win32"
             ? { stdio: "pipe", detached: false }
             : { stdio: "pipe", detached: true }),
           env: {
@@ -310,10 +314,12 @@ async function runFuzzer(
                   }
 
                   // Handle broken properties
-                  const filteredProperties = filterIgnoredProperties(results.brokenProperties);
+                  const filteredProperties = filterIgnoredProperties(
+                    results.brokenProperties
+                  );
                   if (filteredProperties.length > 0) {
                     const repros = filteredProperties
-                      .map((prop) =>
+                      .map((prop: { sequence: string; brokenProperty: string }) =>
                         prepareTrace(
                           fuzzerType,
                           getUid(),
