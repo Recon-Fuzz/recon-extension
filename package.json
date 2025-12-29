@@ -125,6 +125,11 @@
           "group": "2_workspace"
         },
         {
+          "command": "recon.generateMockAndAddToSetup",
+          "when": "resourceExtname == .json || resourceExtname == .sol || resourceExtname == .vy",
+          "group": "2_workspace"
+        },
+        {
           "command": "recon.generateTargetFunctions",
           "when": "resourceExtname == .json || resourceExtname == .sol || resourceExtname == .vy",
           "group": "2_workspace"
@@ -240,6 +245,11 @@
       {
         "command": "recon.generateMock",
         "title": "Generate Solidity Mock",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.generateMockAndAddToSetup",
+        "title": "Generate Mock and add to Setup",
         "category": "Recon"
       },
       {
