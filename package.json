@@ -338,19 +338,12 @@
           "order": 5,
           "description": "Number of workers for Echidna fuzzing"
         },
-        "recon.echidna.symExec": {
-          "type": "boolean",
-          "default": true,
-          "scope": "resource",
-          "order": 6,
-          "description": "Enable Echidna symbolic execution worker (symExec)"
-        },
         "recon.medusa.testLimit": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "scope": "resource",
-          "order": 7,
+          "order": 6,
           "description": "Test limit for Medusa fuzzing"
         },
         "recon.medusa.workers": {
@@ -358,7 +351,7 @@
           "default": 10,
           "minimum": 1,
           "scope": "resource",
-          "order": 8,
+          "order": 7,
           "description": "Number of workers for Medusa fuzzing"
         },
         "recon.halmos.depth": {
@@ -366,7 +359,7 @@
           "default": 22,
           "minimum": 1,
           "scope": "resource",
-          "order": 9,
+          "order": 8,
           "description": "Maximum call depth for Halmos symbolic execution"
         },
         "recon.halmos.unroll": {
@@ -374,7 +367,7 @@
           "default": 256,
           "minimum": 1,
           "scope": "resource",
-          "order": 10,
+          "order": 9,
           "description": "Maximum loop unrolling factor for Halmos"
         },
         "recon.halmos.solver": {
@@ -387,7 +380,7 @@
             "bitwuzla",
             "yices"
           ],
-          "order": 11,
+          "order": 10,
           "description": "SMT solver to use for Halmos symbolic execution"
         },
         "recon.foundryConfigPath": {
@@ -395,14 +388,14 @@
           "default": "foundry.toml",
           "description": "Path to foundry.toml configuration file (relative to workspace root)",
           "scope": "resource",
-          "order": 12
+          "order": 11
         },
         "recon.forge.buildArgs": {
           "type": "string",
           "default": "",
           "description": "Extra arguments to pass to forge build command (e.g. --via-ir)",
           "scope": "resource",
-          "order": 13
+          "order": 12
         },
         "recon.forge.testVerbosity": {
           "type": "string",
@@ -416,28 +409,28 @@
           ],
           "description": "Verbosity level for forge test command",
           "scope": "resource",
-          "order": 14
+          "order": 13
         },
         "recon.mocksFolderPath": {
           "type": "string",
           "default": "test/recon/mocks",
           "description": "Path to store generated mock contracts (relative to foundry.toml location)",
           "scope": "resource",
-          "order": 15
+          "order": 14
         },
         "recon.mockAutoSave": {
           "type": "boolean",
           "default": true,
           "description": "Automatically save generated mock contracts to disk",
           "scope": "resource",
-          "order": 16
+          "order": 15
         },
         "recon.customTestFolderPath": {
           "type": "string",
           "default": "",
           "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
           "scope": "resource",
-          "order": 17
+          "order": 16
         }
       }
     }
