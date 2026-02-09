@@ -29,7 +29,7 @@ abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils, CanaryS
     {{#each contracts}}
     {{this.name}} {{camel this.name}};
     {{/each}}
-    
+
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry
     function setup() internal virtual override {
@@ -40,15 +40,17 @@ abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils, CanaryS
 
     /// === MODIFIERS === ///
     /// Prank admin and actor
-    
+
     modifier asAdmin {
-        vm.prank(address(this));
+        vm.startPrank(address(this));
         _;
+        vm.stopPrank();
     }
 
     modifier asActor {
-        vm.prank(address(_getActor()));
+        vm.startPrank(address(_getActor()));
         _;
+        vm.stopPrank();
     }
 }
 `, { noEscape: true });
