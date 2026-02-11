@@ -169,13 +169,23 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             cleanedHtmlPath = path.join(dir, `covered.${timestamp}-cleaned.html`);
         }
 
+        const originalHtmlPath = path.join(dir, type === 'medusa' ? 'coverage_report.html' : `covered.${filename.split('.')[1]}.html`);
+
+        let needsRegeneration = false;
         try {
-            // Check if cleaned report exists
             await fs.access(cleanedHtmlPath);
+            // Cleaned report exists - check if source is newer
+            const [cleanedStats, originalStats] = await Promise.all([
+                fs.stat(cleanedHtmlPath),
+                fs.stat(originalHtmlPath)
+            ]);
+            needsRegeneration = originalStats.mtime > cleanedStats.mtime;
         } catch {
-            // Generate it if it doesn't exist
-            const originalHtmlPath = path.join(dir, type === 'medusa' ? 'coverage_report.html' : `covered.${filename.split('.')[1]}.html`);
-            
+            // Cleaned report doesn't exist
+            needsRegeneration = true;
+        }
+
+        if (needsRegeneration) {
             try {
                 await vscode.commands.executeCommand('recon.cleanupCoverageReport', vscode.Uri.file(originalHtmlPath));
                 await new Promise(resolve => setTimeout(resolve, 1000));
