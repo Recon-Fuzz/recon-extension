@@ -11,6 +11,7 @@ import {
   getEnvironmentPath,
 } from "../utils";
 import { ServiceContainer } from "../services/serviceContainer";
+import { applyDynamicReplacements } from "../utils/dynamicReplacement";
 
 export function registerFuzzingCommands(
   context: vscode.ExtensionContext,
@@ -93,6 +94,9 @@ async function runFuzzer(
       target || "CryticTester"
     } -vv --solver-timeout-assertion 0 --loop ${loop} `;
   }
+
+  // Apply dynamic replacements to Setup.sol before fuzzing
+  await applyDynamicReplacements();
 
   // Create output channel for live feedback
   const outputChannel = services.outputService.createFuzzerOutputChannel(

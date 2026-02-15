@@ -152,6 +152,10 @@
           "group": "1_conversion"
         },
         {
+          "command": "recon.dynamicReplacement",
+          "group": "1_conversion"
+        },
+        {
           "command": "recon.linkLibraries",
           "group": "2_analysis"
         }
@@ -266,6 +270,12 @@
         "command": "recon.linkLibraries",
         "title": "Link Libraries (Experimental)",
         "category": "Recon"
+      },
+      {
+        "command": "recon.dynamicReplacement",
+        "title": "Dynamic Replacement",
+        "category": "Recon",
+        "icon": "$(symbol-constant)"
       },
       {
         "command": "recon.previewArgusCallGraph",
