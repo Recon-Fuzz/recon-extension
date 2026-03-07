@@ -12,6 +12,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
     private saveStateTimeout: NodeJS.Timeout | null = null;
     private isStateSaving = false;
     private searchQuery: string = '';
+    private setupConstants: Record<string, string> = {};
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -26,13 +27,62 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             }),
             vscode.commands.registerCommand('recon.hideAllFiles', () => {
                 this.setShowAllFiles(false);
+            }),
+            vscode.commands.registerCommand('recon.updateConstant', async (name: string, value: string) => {
+                this.setupConstants[name] = value;
+                await this.saveSetupConstants();
+                this.refresh();
             })
         );
 
         vscode.commands.executeCommand('setContext', 'recon.showingAllFiles', this.showAllFiles);
 
         this.contracts.forEach(c => this.collapsedContracts.add(c.name));
+        this.loadSetupConstants();
         this.startWatchingReconJson();
+    }
+
+    private async loadSetupConstants() {
+        try {
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+            if (!workspaceRoot) return;
+
+            const setupPath = path.join(workspaceRoot, 'test', 'recon', 'Setup.sol');
+            try {
+                const content = await fs.readFile(setupPath, 'utf8');
+                const constantPattern = /\b(?:uint|int|address|bool|bytes\d*|string)\s+(?:public\s+)?(\w+)\s*=\s*([^;]+);/g;
+                let match;
+                while ((match = constantPattern.exec(content)) !== null) {
+                    this.setupConstants[match[1]] = match[2].trim();
+                }
+            } catch (e) {
+                // Setup.sol may not exist yet
+            }
+        } catch (e) {
+            console.error('Error loading setup constants:', e);
+        }
+    }
+
+    private async saveSetupConstants() {
+        try {
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+            if (!workspaceRoot) return;
+
+            const setupPath = path.join(workspaceRoot, 'test', 'recon', 'Setup.sol');
+            try {
+                let content = await fs.readFile(setupPath, 'utf8');
+                for (const [name, value] of Object.entries(this.setupConstants)) {
+                    const regex = new RegExp(`(\\b(?:uint|int|address|bool|bytes\\d*|string)\\s+(?:public\\s+)?${name}\\s*=\\s*)([^;]+)(;)`, 'g');
+                    content = content.replace(regex, `$1${value}$3`);
+                }
+                await fs.writeFile(setupPath, content, 'utf8');
+                vscode.window.showInformationMessage('Setup constants updated successfully');
+            } catch (e) {
+                vscode.window.showErrorMessage('Could not save Setup.sol constants');
+            }
+        } catch (e) {
+            console.error('Error saving setup constants:', e);
+        }
     }
 
     private async setShowAllFiles(value: boolean) {
