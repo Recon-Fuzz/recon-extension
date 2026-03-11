@@ -10,6 +10,7 @@ import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
+import { DynamicReplacementPanel } from './dynamicReplacement';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Create services
@@ -61,6 +62,13 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('recon.logToFoundry', () => {
             const provider = new LogToFoundryViewProvider(context.extensionUri);
             provider.createWebviewPanel();
+        })
+    );
+
+    // Register Dynamic Replacement command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon-fuzz.openDynamicReplacement', () => {
+            DynamicReplacementPanel.createOrShow(context.extensionUri);
         })
     );
 

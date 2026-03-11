@@ -284,6 +284,11 @@
         "title": "Forge Build (with build-info)",
         "category": "Recon",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "recon-fuzz.openDynamicReplacement",
+        "title": "Open Dynamic Replacement",
+        "category": "Recon Fuzz"
       }
     ],
     "configuration": {
