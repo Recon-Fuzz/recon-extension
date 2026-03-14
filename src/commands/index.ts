@@ -6,6 +6,7 @@ import { registerCoverageCommands } from './coverageCommands';
 import { registerMockCommands } from './mockCommands';
 import { registerTestCommands } from './testCommands';
 import { registerLibraryCommands } from './libraryCommands';
+import { registerDynamicReplacementCommands } from './dynamicReplacementCommands';
 import { ServiceContainer } from '../services/serviceContainer';
 
 export async function registerCommands(
@@ -20,4 +21,5 @@ export async function registerCommands(
     registerMockCommands(context, services);
     registerTestCommands(context, services);
     registerLibraryCommands(context, services);
+    registerDynamicReplacementCommands(context, services);
 }

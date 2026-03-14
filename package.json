@@ -61,6 +61,13 @@
           "id": "recon-coverage",
           "name": "Coverage Reports",
           "icon": "images/icon.svg"
+        },
+        {
+          "type": "webview",
+          "id": "recon-dynamic-replacement",
+          "name": "Dynamic Replacement",
+          "icon": "images/icon.svg",
+          "when": "recon.dynamicReplacementEnabled"
         }
       ]
     },
@@ -284,6 +291,11 @@
         "title": "Forge Build (with build-info)",
         "category": "Recon",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "recon.toggleDynamicReplacement",
+        "title": "Recon: Toggle Dynamic Replacement",
+        "icon": "$(replace-all)"
       }
     ],
     "configuration": {

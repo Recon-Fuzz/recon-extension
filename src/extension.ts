@@ -10,6 +10,7 @@ import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
+import { DynamicReplacementViewProvider } from './views/dynamicReplacementView';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Create services
@@ -21,12 +22,14 @@ export async function activate(context: vscode.ExtensionContext) {
     const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
     const reconContractsProvider = new ReconContractsViewProvider(context.extensionUri, context);
     const coverageViewProvider = new CoverageViewProvider(context.extensionUri);
+    const dynamicReplacementProvider = new DynamicReplacementViewProvider(context.extensionUri);
 
     // Register WebView Providers
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('recon-main', reconMainProvider),
         vscode.window.registerWebviewViewProvider('recon-contracts', reconContractsProvider),
         vscode.window.registerWebviewViewProvider('recon-coverage', coverageViewProvider),
+        vscode.window.registerWebviewViewProvider('recon-dynamic-replacement', dynamicReplacementProvider),
         reconContractsProvider
     );
 
@@ -55,6 +58,20 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     vscode.commands.executeCommand('recon.refreshContracts');
     vscode.commands.executeCommand('recon.refreshCoverage');
+
+    // Register Dynamic Replacement toggle
+    let dynamicReplacementEnabled = false;
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.toggleDynamicReplacement', () => {
+            dynamicReplacementEnabled = !dynamicReplacementEnabled;
+            vscode.commands.executeCommand(
+                'setContext', 'recon.dynamicReplacementEnabled', dynamicReplacementEnabled
+            );
+            vscode.window.showInformationMessage(
+                `Dynamic Replacement ${dynamicReplacementEnabled ? 'enabled' : 'disabled'}`
+            );
+        })
+    );
 
     // Register Log to Foundry command
     context.subscriptions.push(

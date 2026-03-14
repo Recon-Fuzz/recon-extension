@@ -138,3 +138,22 @@ export interface ProcessResult {
     stdout: string;
     stderr: string;
 }
+
+export interface DynamicReplacement {
+    target: string;
+    replacement: string;
+    endOfTargetMarker?: string;
+    targetContract?: string;
+}
+
+export interface ParsedConstant {
+    name: string;
+    typeName: string;
+    initialValue: string;
+    fullAssignment: string;
+}
+
+export interface PrepareContract {
+    file: string;
+    replacements: DynamicReplacement[];
+}

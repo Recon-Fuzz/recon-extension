@@ -11,6 +11,7 @@ import {
   getEnvironmentPath,
 } from "../utils";
 import { ServiceContainer } from "../services/serviceContainer";
+import { applyDynamicReplacements, restoreDynamicReplacements } from "./dynamicReplacementCommands";
 
 export function registerFuzzingCommands(
   context: vscode.ExtensionContext,
@@ -104,11 +105,19 @@ async function runFuzzer(
   );
   outputChannel.show();
 
+  // Apply dynamic replacements if configured
+  const replacementBackup = await applyDynamicReplacements(workspaceRoot);
+  if (replacementBackup) {
+      outputChannel.appendLine('[Recon] Dynamic replacements applied to Setup.sol');
+  }
+
   let output = "";
   let processCompleted = false;
   let childProcess: any = null;
   let hasEnoughData = false;
+  let replacementsRestored = false;
 
+  try {
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -135,6 +144,11 @@ async function runFuzzer(
 
         // Handle graceful shutdown
         async function handleShutdown(reason: string) {
+          if (replacementBackup && !replacementsRestored) {
+              replacementsRestored = true;
+              await restoreDynamicReplacements(replacementBackup.originalContent, replacementBackup.setupPath);
+              outputChannel.appendLine('[Recon] Setup.sol restored after fuzzing');
+          }
           if (!processCompleted && childProcess) {
             processCompleted = true;
             resolve();
@@ -421,4 +435,11 @@ async function runFuzzer(
       });
     }
   );
+  } finally {
+    if (replacementBackup && !replacementsRestored) {
+      replacementsRestored = true;
+      await restoreDynamicReplacements(replacementBackup.originalContent, replacementBackup.setupPath);
+      outputChannel.appendLine('[Recon] Setup.sol restored (cleanup)');
+    }
+  }
 }
