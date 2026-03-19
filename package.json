@@ -61,6 +61,12 @@
           "id": "recon-coverage",
           "name": "Coverage Reports",
           "icon": "images/icon.svg"
+        },
+        {
+          "type": "webview",
+          "id": "recon-dynamic-replacement",
+          "name": "Dynamic Replacement",
+          "icon": "images/icon.svg"
         }
       ]
     },

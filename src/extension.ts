@@ -4,6 +4,7 @@ import { StatusBarService } from './services/statusBarService';
 import { ReconMainViewProvider } from './reconMainView';
 import { ReconContractsViewProvider } from './reconContractsView';
 import { CoverageViewProvider } from './coverageView';
+import { DynamicReplacementViewProvider } from './dynamicReplacementView';
 import { SolFileProcessor } from './solFileProcessor';
 import { OutputService } from './services/outputService';
 import { ContractWatcherService } from './services/contractWatcherService';
@@ -21,12 +22,14 @@ export async function activate(context: vscode.ExtensionContext) {
     const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
     const reconContractsProvider = new ReconContractsViewProvider(context.extensionUri, context);
     const coverageViewProvider = new CoverageViewProvider(context.extensionUri);
+    const dynamicReplacementProvider = new DynamicReplacementViewProvider(context.extensionUri, context);
 
     // Register WebView Providers
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('recon-main', reconMainProvider),
         vscode.window.registerWebviewViewProvider('recon-contracts', reconContractsProvider),
         vscode.window.registerWebviewViewProvider('recon-coverage', coverageViewProvider),
+        vscode.window.registerWebviewViewProvider('recon-dynamic-replacement', dynamicReplacementProvider),
         reconContractsProvider
     );
 
