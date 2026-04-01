@@ -1,3 +1,5 @@
+[![By Recon](https://getrecon.xyz/api/badge?type=recon)](https://getrecon.xyz)
+
 # Recon - Smart Contract Fuzzing Extension
 
 <p align="center">
