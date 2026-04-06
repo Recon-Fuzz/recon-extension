@@ -8,6 +8,7 @@ export enum Actor {
 export enum Mode {
     NORMAL = 'normal',
     FAIL = 'fail',
+    CANARY = 'canary',
     CATCH = 'catch'
 }
 
@@ -78,6 +79,7 @@ export interface TestFunction {
 export interface FunctionDefinitionParams {
     contractName: string;
     contractPath: string;
+    jsonPath?: string; 
     functionName: string;
     abi: Abi;
     actor: Actor;
