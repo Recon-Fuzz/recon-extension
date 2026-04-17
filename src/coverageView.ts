@@ -45,8 +45,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                     await this.enableCoverage(message.path);
                     break;
                 case 'openExternal':
-                    const type = message.path.includes('medusa') ? 'medusa' : 'echidna';
-                    await this.openCleandReport(message.path, type);
+                    await this.openReport(message.path);
                     break;
                 case 'showCoverageStats':
                     await this.showCoverageStats(message.path);
@@ -63,7 +62,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
         }
 
         this._filesWatcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(foundryRoot, '{echidna/**/covered.*.lcov,medusa/**/lcov.info}')
+            new vscode.RelativePattern(foundryRoot, '{echidna/**/covered.*.lcov,recon/**/covered.*.lcov,medusa/**/lcov.info}')
         );
 
         this._filesWatcher.onDidCreate(() => this._updateWebview());
@@ -75,23 +74,28 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
         const foundryRoot = path.dirname(getFoundryConfigPath(this._workspaceRoot));
         const files: CoverageFile[] = [];
 
-        // Check Echidna coverage files
-        try {
-            const echidnaDir = path.join(foundryRoot, 'echidna');
-            const echidnaEntries = await fs.readdir(echidnaDir, { withFileTypes: true });
-            
-            for (const entry of echidnaEntries) {
-                if (entry.isFile() && entry.name.startsWith('covered.') && entry.name.endsWith('.lcov')) {
-                    const timestamp = new Date(parseInt(entry.name.split('.')[1]) * 1000);
-                    files.push({
-                        path: path.join(echidnaDir, entry.name),
-                        type: FuzzerTool.ECHIDNA,
-                        timestamp
-                    });
+        // Echidna and Recon Fuzzer share the same lcov-naming convention
+        // (covered.<unix>.lcov), they just live in different sibling dirs.
+        const lcovSources: { dir: string; type: FuzzerTool }[] = [
+            { dir: path.join(foundryRoot, 'echidna'), type: FuzzerTool.ECHIDNA },
+            { dir: path.join(foundryRoot, 'recon'), type: FuzzerTool.RECON_FUZZER }
+        ];
+        for (const src of lcovSources) {
+            try {
+                const entries = await fs.readdir(src.dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isFile() && entry.name.startsWith('covered.') && entry.name.endsWith('.lcov')) {
+                        const timestamp = new Date(parseInt(entry.name.split('.')[1]) * 1000);
+                        files.push({
+                            path: path.join(src.dir, entry.name),
+                            type: src.type,
+                            timestamp
+                        });
+                    }
                 }
+            } catch (e) {
+                // Directory might not exist — that's fine.
             }
-        } catch (e) {
-            // Echidna directory might not exist
         }
 
         // Check Medusa coverage files
@@ -155,6 +159,45 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
         
         // Enable watching for coverage updates
         await vscode.commands.executeCommand('coverage-gutters.watchCoverageAndVisibleEditors');
+    }
+
+    /**
+     * Picks the right open strategy based on which source dir produced the
+     * .lcov file:
+     *   - <foundryRoot>/recon/  → Recon Fuzzer (HTML already cleaned, no
+     *     cleanup pass; just open the existing report).
+     *   - <foundryRoot>/echidna/ → run the cleanup pass + open cleaned HTML.
+     *   - <foundryRoot>/medusa/  → cleanup + open cleaned HTML.
+     */
+    private async openReport(coveragePath: string): Promise<void> {
+        const lower = coveragePath.toLowerCase();
+        if (lower.includes(`${path.sep}recon${path.sep}`) || lower.includes('/recon/')) {
+            await this.openReconReport(coveragePath);
+            return;
+        }
+        const type: 'echidna' | 'medusa' = lower.includes('medusa') ? 'medusa' : 'echidna';
+        await this.openCleandReport(coveragePath, type);
+    }
+
+    private async openReconReport(coveragePath: string): Promise<void> {
+        const dir = path.dirname(coveragePath);
+        const filename = path.basename(coveragePath);
+        const timestamp = filename.split('.')[1];
+        const htmlPath = path.join(dir, `covered.${timestamp}.html`);
+        try {
+            await fs.access(htmlPath);
+        } catch {
+            vscode.window.showWarningMessage(`Recon AI: HTML report not found · ${htmlPath}`);
+            return;
+        }
+        const content = await fs.readFile(htmlPath, 'utf8');
+        const panel = vscode.window.createWebviewPanel(
+            'coverageReport',
+            path.basename(htmlPath),
+            vscode.ViewColumn.One,
+            { enableScripts: true, retainContextWhenHidden: true }
+        );
+        panel.webview.html = content;
     }
 
     private async openCleandReport(coveragePath: string, type: 'echidna' | 'medusa'): Promise<void> {
@@ -699,7 +742,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                             <div class="coverage-left">
                                 <i class="codicon codicon-file"></i>
                                 <div class="coverage-info">
-                                    <div class="coverage-type">${file.type === FuzzerTool.ECHIDNA ? 'Echidna' : 'Medusa'}</div>
+                                    <div class="coverage-type">${file.type === FuzzerTool.ECHIDNA ? 'Echidna' : file.type === FuzzerTool.RECON_FUZZER ? 'Recon Fuzzer' : 'Medusa'}</div>
                                     <div class="coverage-date">
                                         ${file.timestamp.toLocaleString()}
                                     </div>

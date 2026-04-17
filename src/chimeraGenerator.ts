@@ -155,7 +155,9 @@ export class ChimeraGenerator {
     private async updateGitignore(): Promise<void> {
         const foundryRoot = await this.getFoundryRoot();
         const gitignorePath = path.join(foundryRoot, '.gitignore');
-        const newLines = '\n# Coverage files\ncrytic-export\nechidna\nmedusa\n';
+        // `recon`  → Recon Fuzzer corpus + coverage output (--corpus-dir recon)
+        // `.recon` → on-disk run history written by the extension under <ws>/.recon/
+        const requiredEntries = ['crytic-export', 'echidna', 'medusa', 'recon', '.recon'];
         try {
             let content = '';
             try {
@@ -163,13 +165,16 @@ export class ChimeraGenerator {
             } catch {
                 // File doesn't exist, start with empty content
             }
-            if (!content.includes('crytic-export') ||
-                !content.includes('echidna') ||
-                !content.includes('medusa')) {
+            const lines = content.split(/\r?\n/);
+            const present = new Set(lines.map((l) => l.trim()));
+            const missing = requiredEntries.filter((e) => !present.has(e));
+            if (missing.length > 0) {
                 if (content && !content.endsWith('\n')) {
                     content += '\n';
                 }
-                content += newLines;
+                // First time we touch the file, also drop the section header.
+                const needsHeader = !lines.some((l) => l.trim() === '# Coverage files');
+                content += (needsHeader ? '\n# Coverage files\n' : '') + missing.join('\n') + '\n';
                 await fs.writeFile(gitignorePath, content);
             }
         } catch (error) {

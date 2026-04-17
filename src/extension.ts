@@ -12,17 +12,28 @@ import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
+import { ReconCliService } from './services/reconCliService';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Create services
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
     const workspaceService = new WorkspaceService();
+    const reconCliService = new ReconCliService();
 
     // Create view providers
-    const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
+    const reconMainProvider = new ReconMainViewProvider(context.extensionUri, reconCliService);
     const reconContractsProvider = new ReconContractsViewProvider(context.extensionUri, context);
     const coverageViewProvider = new CoverageViewProvider(context.extensionUri);
+
+    // "Install Recon CLI" command — invoked by the install chip on the
+    // Recon Fuzzer radio in the cockpit.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.installReconCli', async () => {
+            const ok = await reconCliService.install();
+            if (ok) { reconMainProvider.refresh(); }
+        })
+    );
 
     // Register WebView Providers
     context.subscriptions.push(
