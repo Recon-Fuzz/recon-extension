@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Scaffold and run Invariant Tests with Medusa, Echidna and Halmos, automatically debug broken properties with Foundry",
-  "version": "0.0.30",
+  "version": "0.0.31",
   "license": "GPL-2.0",
   "publisher": "Recon-Fuzz",
   "repository": {
@@ -72,6 +72,12 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "recon.replayReconFuzzer",
+          "when": "false"
+        }
+      ],
       "view/item/context": [
         {
           "command": "recon.clone",
@@ -142,6 +148,11 @@
         {
           "command": "recon.cleanupCoverageReport",
           "when": "resourceExtname == .html && (resourcePath =~ /echidna/ || resourcePath =~ /medusa/ || resourcePath =~ /halmos/)",
+          "group": "2_workspace"
+        },
+        {
+          "command": "recon.replayReconFuzzer",
+          "when": "resourceExtname == .txt && resourcePath =~ /[\\\\/]recon[\\\\/]/",
           "group": "2_workspace"
         }
       ],
@@ -221,6 +232,23 @@
         "command": "recon.runHalmos",
         "title": "Run Halmos",
         "category": "Recon"
+      },
+      {
+        "command": "recon.runReconFuzzer",
+        "title": "Run Recon Fuzzer",
+        "category": "Recon"
+      },
+      {
+        "command": "recon.replayReconFuzzer",
+        "title": "Replay corpus with Recon Fuzzer",
+        "category": "Recon",
+        "icon": "$(debug-rerun)"
+      },
+      {
+        "command": "recon.installReconCli",
+        "title": "Install Recon CLI",
+        "category": "Recon AI",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "recon.runTest",
@@ -546,6 +574,27 @@
           "description": "Custom path for test files (relative to foundry.toml location). If empty, standard paths will be searched",
           "scope": "resource",
           "order": 23
+        },
+        "recon.reconFuzzer.generateEchidnaCorpus": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "order": 24,
+          "description": "When checked, Recon Fuzzer keeps Echidna's corpus alongside its own (uses --recon-corpus-dir). When unchecked, only the combined Recon corpus is written (uses --corpus-dir)."
+        },
+        "recon.reconFuzzer.skipPureViewFunctions": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "order": 25,
+          "description": "When checked, Recon Fuzzer skips pure/view functions during fuzzing (passes --mutable-only)."
+        },
+        "recon.reconFuzzer.webUi": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "order": 26,
+          "description": "Experimental: launch Recon Fuzzer with the interactive web UI (passes --web) and open https://recon-fuzzer.vercel.app/ in a side panel."
         }
       }
     }
@@ -561,32 +610,32 @@
     "prepare": "yarn run compile"
   },
   "devDependencies": {
-    "@types/jsdom": "^21.1.7",
+    "@types/jsdom": "^28.0.1",
     "@types/mocha": "^10.0.10",
-    "@types/node": "24.0.4",
+    "@types/node": "25.6.0",
     "@types/vscode": "^1.88.0",
-    "@typescript-eslint/eslint-plugin": "^8.35.0",
-    "@typescript-eslint/parser": "^8.35.0",
-    "@vscode/test-cli": "^0.0.11",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
+    "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.29.0",
-    "typescript": "^5.8.3"
+    "eslint": "^10.2.0",
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "@recon-fuzz/log-parser": "^0.0.38",
     "@solidity-parser/parser": "^0.20.1",
-    "@types/prismjs": "^1.26.5",
-    "@vscode/codicons": "^0.0.41",
+    "@types/prismjs": "^1.26.6",
+    "@vscode/codicons": "^0.0.45",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "abi-to-mock": "^1.0.11",
     "case": "^1.6.3",
     "echidna-coverage-parser": "^1.0.1",
-    "handlebars": "^4.7.8",
+    "handlebars": "^4.7.9",
     "html2canvas": "^1.4.1",
-    "jsdom": "^26.1.0",
+    "jsdom": "^29.0.2",
     "prismjs": "^1.30.0",
-    "solc-typed-ast": "^18.2.6",
-    "yaml": "^2.8.0"
+    "solc-typed-ast": "^20.0.5",
+    "yaml": "^2.8.3"
   },
   "overrides": {
     "tmp": "0.2.4"
