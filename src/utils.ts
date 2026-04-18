@@ -255,6 +255,37 @@ export async function cleanupCoverageReport(workspaceRoot: string, content: stri
     }
 }
 
+/**
+ * Pure helper — kept separate from `getEnvironmentPath()` so it can be unit-tested
+ * without a live VS Code extension host.
+ *
+ * Combines the user-configured PATH, the login-shell PATH, and the current
+ * process PATH into a single deduplicated PATH string using the correct
+ * OS separator (`;` on Windows, `:` elsewhere).
+ *
+ * On Windows the shell-PATH source is unused (no login shell is sourced), so
+ * the result is `userPath + sep + defaultPath` when `userPath` is non-empty,
+ * or just `defaultPath` otherwise. This mirrors prior behaviour but with the
+ * correct separator so Windows paths like `C:\foo` are not split on `:`.
+ */
+export function combinePathSources(
+    userPath: string,
+    shellPath: string,
+    defaultPath: string,
+    platform: NodeJS.Platform = process.platform,
+    sep: string = path.delimiter,
+): string {
+    if (platform === 'win32') {
+        return userPath ? `${userPath}${sep}${defaultPath}` : defaultPath;
+    }
+    const combined = new Set([
+        ...userPath.split(sep),
+        ...shellPath.split(sep),
+        ...defaultPath.split(sep),
+    ].filter(Boolean));
+    return Array.from(combined).join(sep);
+}
+
 export function getEnvironmentPath(): string {
     const defaultPath = process.env.PATH || '';
 
@@ -276,15 +307,7 @@ export function getEnvironmentPath(): string {
         } catch (e) {
             console.warn('Failed to get shell PATH:', e);
         }
-    } else {
-        return userPath ? `${userPath}:${process.env.PATH}` : process.env.PATH || '';
     }
 
-    const combined = new Set([
-        ...userPath.split(':'),
-        ...shellPath.split(':'),
-        ...defaultPath.split(':'),
-    ].filter(Boolean));
-
-    return Array.from(combined).join(':');
+    return combinePathSources(userPath, shellPath, defaultPath);
 }
