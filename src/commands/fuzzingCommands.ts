@@ -232,7 +232,7 @@ async function runFuzzer(
     }
     const replayFlag =
       opts.useReconWrapper && opts.replayFile
-        ? ` --replay "${opts.replayFile.replace(/"/g, '\\"')}"`
+        ? ` --replay '${opts.replayFile.replace(/'/g, "'\\''")}'`
         : "";
     command = `${binary} . --contract ${
       target || "CryticTester"

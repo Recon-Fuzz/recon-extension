@@ -555,7 +555,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         opacity: 0.7;
                         font-size: 10px;
                         margin-top: 2px;
-                        font-family: var (--vscode-editor-font-family);
+                        font-family: var(--vscode-editor-font-family);
                         cursor: pointer;
                         white-space: nowrap;
                         overflow: hidden;
@@ -1487,7 +1487,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                             <span class="optimized-radio">
                                                 <label class="radio-label ${config.mode === Mode.CANARY ? 'selected' : ''}" 
                                                        data-value="canary" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'canary', this)">
+                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'canary', this)">
                                                     Canary
                                                 </label>
                                             </span>
