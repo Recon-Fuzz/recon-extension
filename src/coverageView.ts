@@ -201,7 +201,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             'coverageReport',
             path.basename(htmlPath),
             vscode.ViewColumn.One,
-            { enableScripts: true, retainContextWhenHidden: true }
+            { enableScripts: false, retainContextWhenHidden: true }
         );
         panel.webview.html = content;
     }
@@ -267,7 +267,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             path.basename(cleanedHtmlPath), // Use the filename as the panel title
             vscode.ViewColumn.One,
             {
-                enableScripts: true,
+                enableScripts: false,
                 retainContextWhenHidden: true,
                 enableFindWidget: true
             }
@@ -757,9 +757,9 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                             </div>
                             <div class="coverage-actions">
                                 ${file.type === FuzzerTool.ECHIDNA ? `
-                                    <i class="codicon codicon-checklist coverage-stats" onclick="showCoverageStats('${file.path}', event)" title="Coverage Stats"></i>
+                                    <i class="codicon codicon-checklist coverage-stats" onclick="showCoverageStats('${escapeHtml(file.path)}', event)" title="Coverage Stats"></i>
                                 ` : ''}
-                                <i class="codicon codicon-link-external external-link" onclick="openExternal('${file.path}', event)" title="Open in browser"></i>
+                                <i class="codicon codicon-link-external external-link" onclick="openExternal('${escapeHtml(file.path)}', event)" title="Open in browser"></i>
                             </div>
                         </div>
                     `).join('')}

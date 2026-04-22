@@ -191,7 +191,8 @@ async function runFuzzer(
   const foundryConfigPath = getFoundryConfigPath(workspaceRoot);
   const foundryRoot = path.dirname(foundryConfigPath);
 
-  let command: string;
+  let cmdBinary: string;
+  let cmdArgs: string[];
   let webUiEnabled = false;
 
   if (fuzzerType === Fuzzer.ECHIDNA) {
@@ -203,42 +204,39 @@ async function runFuzzer(
 
     // Pick the binary: recon fuzz wrapper, the validated custom echidna
     // path, or `echidna` from PATH.
-    const binary = opts.useReconWrapper ? "recon fuzz" : (validatedCommand || "echidna");
-    // Recon Fuzzer writes corpus + coverage to ./recon/ so we can tell its
-    // output apart from raw Echidna's ./echidna/ output. The HTML reports
-    // recon produces are already cleaned, so we won't need a cleanup pass.
-    //
-    // When the user opts in to "generate echidna corpus" we keep Echidna's
-    // own corpus too (--recon-corpus-dir). Otherwise the combined Recon
-    // corpus replaces it (--corpus-dir).
-    let corpusFlag = "";
-    let mutableOnlyFlag = "";
-    let webFlag = "";
+    // Args array prevents command injection — each value is a separate
+    // argv element, never parsed by a shell.
+    if (opts.useReconWrapper) {
+      cmdBinary = "recon";
+      cmdArgs = ["fuzz"];
+    } else {
+      cmdBinary = validatedCommand || "echidna";
+      cmdArgs = [];
+    }
+    cmdArgs.push(".", "--contract", target || "CryticTester",
+      "--config", "echidna.yaml", "--format", "text",
+      "--workers", String(workers || 10),
+      "--test-limit", String(testLimit), "--test-mode", mode);
+
     if (opts.useReconWrapper) {
       const reconCfg = vscode.workspace.getConfiguration("recon.reconFuzzer");
       const keepEchidnaCorpus = reconCfg.get<boolean>("generateEchidnaCorpus", false);
-      corpusFlag = keepEchidnaCorpus
-        ? " --recon-corpus-dir recon"
-        : " --corpus-dir recon";
+      // Recon Fuzzer writes corpus + coverage to ./recon/ so we can tell
+      // its output apart from raw Echidna's ./echidna/ output.
+      cmdArgs.push(keepEchidnaCorpus ? "--recon-corpus-dir" : "--corpus-dir", "recon");
       if (reconCfg.get<boolean>("skipPureViewFunctions", false)) {
-        mutableOnlyFlag = " --mutable-only";
+        cmdArgs.push("--mutable-only");
       }
-      // --web is interactive and incompatible with a one-shot replay run, so
-      // skip it for replays even if the setting is enabled.
+      // --web is interactive and incompatible with a one-shot replay run,
+      // so skip it for replays even if the setting is enabled.
       if (reconCfg.get<boolean>("webUi", false) && !opts.replayFile) {
-        webFlag = " --web --no-open";
+        cmdArgs.push("--web", "--no-open");
         webUiEnabled = true;
       }
+      if (opts.replayFile) {
+        cmdArgs.push("--replay", opts.replayFile);
+      }
     }
-    const replayFlag =
-      opts.useReconWrapper && opts.replayFile
-        ? ` --replay '${opts.replayFile.replace(/'/g, "'\\''")}'`
-        : "";
-    command = `${binary} . --contract ${
-      target || "CryticTester"
-    } --config echidna.yaml --format text --workers ${
-      workers || 10
-    } --test-limit ${testLimit} --test-mode ${mode}${corpusFlag}${mutableOnlyFlag}${webFlag}${replayFlag}`;
 
     if (webUiEnabled) {
       openReconFuzzerWebPanel();
@@ -249,18 +247,19 @@ async function runFuzzer(
     const workers = getWorkerConfig('medusa');
     const testLimit = config.get<number>("testLimit", 0);
 
-    command = `${validatedCommand || "medusa"} fuzz --workers ${
-      workers || 10
-    } --test-limit ${testLimit}`;
+    cmdBinary = validatedCommand || "medusa";
+    cmdArgs = ["fuzz", "--workers", String(workers || 10),
+      "--test-limit", String(testLimit)];
     if (target !== "CryticTester") {
-      command += ` --target-contracts ${target || "CryticTester"}`;
+      cmdArgs.push("--target-contracts", target || "CryticTester");
     }
   } else {
     const config = vscode.workspace.getConfiguration("recon.halmos");
     const loop = config.get<number>("loop", 256);
 
-    command = `halmos --match-contract ${target || "CryticTester"
-      } -vv --solver-timeout-assertion 0 --loop ${loop} `;
+    cmdBinary = "halmos";
+    cmdArgs = ["--match-contract", target || "CryticTester",
+      "-vv", "--solver-timeout-assertion", "0", "--loop", String(loop)];
   }
 
   // Display label distinguishes the Recon-wrapped Echidna from raw Echidna,
@@ -302,10 +301,9 @@ async function runFuzzer(
           progress.report({ message: `Web UI running · open ${RECON_FUZZER_WEB_URL} — Cancel to stop` });
         }
 
-        childProcess = require("child_process").spawn(command, {
+        childProcess = require("child_process").spawn(cmdBinary, cmdArgs, {
           cwd: foundryRoot,
-          shell: true,
-          ...(process.platform === "win32" 
+          ...(process.platform === "win32"
             ? { stdio: "pipe", detached: false }
             : { stdio: "pipe", detached: true }),
           env: {
