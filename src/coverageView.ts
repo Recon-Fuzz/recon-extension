@@ -5,6 +5,11 @@ import { findSrcDirectory, getFoundryConfigPath } from './utils';
 import { CoverageFile, FuzzerTool } from './types';
 import { readCoverageFileAndProcess } from 'echidna-coverage-parser';
 
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 export class CoverageViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _filesWatcher?: vscode.FileSystemWatcher;
@@ -190,12 +195,14 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             vscode.window.showWarningMessage(`Recon AI: HTML report not found · ${htmlPath}`);
             return;
         }
-        const content = await fs.readFile(htmlPath, 'utf8');
+        let content = await fs.readFile(htmlPath, 'utf8');
+        const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">`;
+        content = content.replace('<head>', '<head>' + csp);
         const panel = vscode.window.createWebviewPanel(
             'coverageReport',
             path.basename(htmlPath),
             vscode.ViewColumn.One,
-            { enableScripts: true, retainContextWhenHidden: true }
+            { enableScripts: false, retainContextWhenHidden: true }
         );
         panel.webview.html = content;
     }
@@ -251,8 +258,9 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             </style>
         `;
 
-        // Insert reset styles after the first <head> tag
-        content = content.replace('<head>', '<head>' + resetStyles);
+        // Insert CSP and reset styles after the first <head> tag
+        const cspCleaned = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">`;
+        content = content.replace('<head>', '<head>' + cspCleaned + resetStyles);
         
         // Create a new webview panel with the filename as title
         const panel = vscode.window.createWebviewPanel(
@@ -260,7 +268,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             path.basename(cleanedHtmlPath), // Use the filename as the panel title
             vscode.ViewColumn.One,
             {
-                enableScripts: true,
+                enableScripts: false,
                 retainContextWhenHidden: true,
                 enableFindWidget: true
             }
@@ -454,9 +462,9 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                     </div>
                     <div id="content">
                         ${filesData.map(data => `
-                            <div class="file-section" data-path="${data.path}">
+                            <div class="file-section" data-path="${escapeHtml(data.path)}">
                                 <div class="file-header">
-                                    <div class="file-path">📄 ${data.path}</div>
+                                    <div class="file-path">📄 ${escapeHtml(data.path)}</div>
                                     <div class="coverage-stats">
                                         <div class="stat-item">
                                             <span>Functions:</span>
@@ -479,7 +487,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                                     <tbody>
                                         ${data.data.map(func => `
                                             <tr>
-                                                <td class="function-name">${func.functionName}</td>
+                                                <td class="function-name">${escapeHtml(func.functionName)}</td>
                                                 <td>
                                                     ${func.isFullyCovered ? 
                                                         `<span class="status-tag status-covered">✓ Covered</span>` :
@@ -497,7 +505,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                                             ${func.untouchedContent.length > 0 ? `
                                                 <tr>
                                                     <td colspan="3">
-                                                        <pre class="untouched-code">${func.untouchedContent.join('\n')}</pre>
+                                                        <pre class="untouched-code">${escapeHtml(func.untouchedContent.join('\n'))}</pre>
                                                     </td>
                                                 </tr>
                                             ` : ''}
@@ -750,9 +758,9 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                             </div>
                             <div class="coverage-actions">
                                 ${file.type === FuzzerTool.ECHIDNA ? `
-                                    <i class="codicon codicon-checklist coverage-stats" onclick="showCoverageStats('${file.path}')" title="Coverage Stats"></i>
+                                    <i class="codicon codicon-checklist coverage-stats" onclick="showCoverageStats('${escapeHtml(file.path)}', event)" title="Coverage Stats"></i>
                                 ` : ''}
-                                <i class="codicon codicon-link-external external-link" onclick="openExternal('${file.path}')" title="Open in browser"></i>
+                                <i class="codicon codicon-link-external external-link" onclick="openExternal('${escapeHtml(file.path)}', event)" title="Open in browser"></i>
                             </div>
                         </div>
                     `).join('')}
@@ -780,7 +788,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                         });
                     }
 
-                    function openExternal(path) {
+                    function openExternal(path, event) {
                         event.stopPropagation();
                         vscode.postMessage({
                             type: 'openExternal',
@@ -788,7 +796,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                         });
                     }
 
-                    function showCoverageStats(path) {
+                    function showCoverageStats(path, event) {
                         event.stopPropagation();
                         vscode.postMessage({
                             type: 'showCoverageStats',

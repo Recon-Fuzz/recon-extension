@@ -5,4 +5,4 @@ node_modules
 *.vsix
 .npmrc
 .idea/
-.npmrc
+.DS_Store

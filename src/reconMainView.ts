@@ -404,7 +404,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     
                     document.getElementById('medusa-test-limit')?.addEventListener('change', (e) => {
                         const value = parseInt(e.target.value, 10);
-                        if (!isNaN(value) && value >= 1) {
+                        if (!isNaN(value) && value >= 0) {
                             vscode.postMessage({
                                 type: 'updateMedusaTestLimit',
                                 value: value
@@ -698,7 +698,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                             id="medusa-test-limit"
                             type="number"
                             value="${medusaTestLimit}"
-                            min="1"
+                            min="0"
                         ></vscode-text-field>
                     </div>
                     <div class="setting-group">

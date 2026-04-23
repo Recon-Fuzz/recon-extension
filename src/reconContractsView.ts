@@ -3,6 +3,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ContractMetadata, FunctionConfig, Abi, Actor, Mode } from './types';
 
+function escapeHtmlAttr(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private contracts: ContractMetadata[] = [];
@@ -555,7 +560,7 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         opacity: 0.7;
                         font-size: 10px;
                         margin-top: 2px;
-                        font-family: var (--vscode-editor-font-family);
+                        font-family: var(--vscode-editor-font-family);
                         cursor: pointer;
                         white-space: nowrap;
                         overflow: hidden;
@@ -761,6 +766,10 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                     </div>
                 ` : ''}
                 <script>
+                    function escapeHtml(s) {
+                        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    }
                     const vscode = acquireVsCodeApi();
                     
                     // Store any state that will be needed between reloads
@@ -950,43 +959,45 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 if (!contentDiv) {
                                     contentDiv = document.createElement('div');
                                     contentDiv.className = 'function-content';
+                                    const safeContract = escapeHtml(contractName);
+                                    const safeSig = escapeHtml(fn.signature);
                                     contentDiv.innerHTML = \`
                                         <div class="function-settings">
                                             <div class="optimized-radio-group" data-type="mode">
                                                 <span class="optimized-radio">
-                                                    <label class="radio-label \${config.mode === 'normal' ? 'selected' : ''}" 
-                                                           data-value="normal" 
-                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'mode', 'normal', this)">
+                                                    <label class="radio-label \${config.mode === 'normal' ? 'selected' : ''}"
+                                                           data-value="normal"
+                                                           onclick="updateFunctionSetting('\${safeContract}', '\${safeSig}', 'mode', 'normal', this)">
                                                         Normal
                                                     </label>
                                                 </span>
                                                 <span class="optimized-radio">
-                                                    <label class="radio-label \${config.mode === 'fail' ? 'selected' : ''}" 
-                                                           data-value="fail" 
-                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'mode', 'fail', this)">
+                                                    <label class="radio-label \${config.mode === 'fail' ? 'selected' : ''}"
+                                                           data-value="fail"
+                                                           onclick="updateFunctionSetting('\${safeContract}', '\${safeSig}', 'mode', 'fail', this)">
                                                         Fail
                                                     </label>
                                                 </span>
                                                 <span class="optimized-radio">
-                                                    <label class="radio-label \${config.mode === 'catch' ? 'selected' : ''}" 
-                                                           data-value="catch" 
-                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'mode', 'catch', this)">
+                                                    <label class="radio-label \${config.mode === 'catch' ? 'selected' : ''}"
+                                                           data-value="catch"
+                                                           onclick="updateFunctionSetting('\${safeContract}', '\${safeSig}', 'mode', 'catch', this)">
                                                         Catch
                                                     </label>
                                                 </span>
                                             </div>
                                             <div class="optimized-radio-group" data-type="actor">
                                                 <span class="optimized-radio">
-                                                    <label class="radio-label \${config.actor === 'actor' ? 'selected' : ''}" 
-                                                           data-value="actor" 
-                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'actor', 'actor', this)">
+                                                    <label class="radio-label \${config.actor === 'actor' ? 'selected' : ''}"
+                                                           data-value="actor"
+                                                           onclick="updateFunctionSetting('\${safeContract}', '\${safeSig}', 'actor', 'actor', this)">
                                                         Actor
                                                     </label>
                                                 </span>
                                                 <span class="optimized-radio">
-                                                    <label class="radio-label \${config.actor === 'admin' ? 'selected' : ''}" 
-                                                           data-value="admin" 
-                                                           onclick="updateFunctionSetting('\${contractName}', '\${fn.signature}', 'actor', 'admin', this)">
+                                                    <label class="radio-label \${config.actor === 'admin' ? 'selected' : ''}"
+                                                           data-value="admin"
+                                                           onclick="updateFunctionSetting('\${safeContract}', '\${safeSig}', 'actor', 'admin', this)">
                                                         Admin
                                                     </label>
                                                 </span>
@@ -1075,32 +1086,32 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                         });
                     }
 
-                    // Fuzzy search matching function
+                    // Fuzzy search matching function — escapes HTML in text
+                    // segments to prevent XSS via innerHTML assignment.
                     function fuzzyMatch(text, search) {
                         if (!search || search.trim() === '') {
-                            // Return the original text without highlights when search is empty
-                            return { match: true, score: 0, highlighted: text };
+                            return { match: true, score: 0, highlighted: escapeHtml(text) };
                         }
-                        
+
                         search = search.toLowerCase();
                         const textLower = text.toLowerCase();
-                        
+
                         // Direct substring match (higher priority)
                         if (textLower.includes(search)) {
                             const index = textLower.indexOf(search);
-                            const highlighted = text.substring(0, index) +
-                                '<span class="highlight">' + text.substring(index, index + search.length) + '</span>' +
-                                text.substring(index + search.length);
+                            const highlighted = escapeHtml(text.substring(0, index)) +
+                                '<span class="highlight">' + escapeHtml(text.substring(index, index + search.length)) + '</span>' +
+                                escapeHtml(text.substring(index + search.length));
                             return { match: true, score: 0, highlighted };
                         }
-                        
+
                         // Fuzzy matching
                         let searchIdx = 0;
                         let score = 0;
                         let lastMatchIdx = -1;
                         let consecutive = 0;
                         const matchPositions = [];
-                        
+
                         for (let i = 0; i < textLower.length && searchIdx < search.length; i++) {
                             if (textLower[i] === search[searchIdx]) {
                                 if (lastMatchIdx === i - 1) {
@@ -1109,27 +1120,27 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                 } else {
                                     consecutive = 0;
                                 }
-                                
+
                                 score += i;
                                 lastMatchIdx = i;
                                 matchPositions.push(i);
                                 searchIdx++;
                             }
                         }
-                        
+
                         const match = searchIdx === search.length;
-                        
+
                         let highlighted = '';
                         if (match) {
                             let lastPos = 0;
                             for (const pos of matchPositions) {
-                                highlighted += text.substring(lastPos, pos);
-                                highlighted += '<span class="highlight">' + text[pos] + '</span>';
+                                highlighted += escapeHtml(text.substring(lastPos, pos));
+                                highlighted += '<span class="highlight">' + escapeHtml(text[pos]) + '</span>';
                                 lastPos = pos + 1;
                             }
-                            highlighted += text.substring(lastPos);
+                            highlighted += escapeHtml(text.substring(lastPos));
                         } else {
-                            highlighted = text;
+                            highlighted = escapeHtml(text);
                         }
                         
                         return { match, score, highlighted };
@@ -1396,34 +1407,34 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
     private renderContractItem(contract: ContractMetadata, index: number, array: ContractMetadata[]): string {
         return `
             <div class="contract-group">
-                <div class="contract-item" data-path-name="${contract.jsonPath}" data-name="${contract.name}" data-path="${contract.path}">
+                <div class="contract-item" data-path-name="${escapeHtmlAttr(contract.jsonPath)}" data-name="${escapeHtmlAttr(contract.name)}" data-path="${escapeHtmlAttr(contract.path)}">
                     <div class="contract-header">
                         <div class="contract-title">
                             ${contract.enabled ? `
-                                <button class="toggle-button" onclick="toggleCollapse('${contract.jsonPath}')">
+                                <button class="toggle-button" onclick="toggleCollapse('${escapeHtmlAttr(contract.jsonPath)}')">
                                     <i class="codicon ${this.collapsedContracts.has(contract.jsonPath) ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
                                 </button>
                             ` : ''}
                             <vscode-checkbox
                                 class="contract-checkbox"
-                                id="contract-${contract.jsonPath}"
+                                id="contract-${escapeHtmlAttr(contract.jsonPath)}"
                                 ${contract.enabled ? 'checked' : ''}
-                                onchange="toggleContract('${contract.jsonPath}', this.checked)"
+                                onchange="toggleContract('${escapeHtmlAttr(contract.jsonPath)}', this.checked)"
                             >
-                                <span class="contract-name">${contract.name}</span>
+                                <span class="contract-name">${escapeHtmlAttr(contract.name)}</span>
                             </vscode-checkbox>
                             ${contract.enabled ? `
                                 <vscode-checkbox
                                     class="contract-separated-checkbox"
-                                    id="contract-separated-${contract.jsonPath}"
+                                    id="contract-separated-${escapeHtmlAttr(contract.jsonPath)}"
                                     ${contract.separated !== false ? 'checked' : ''}
-                                    onchange="toggleContractSeparated('${contract.jsonPath}', this.checked)"
+                                    onchange="toggleContractSeparated('${escapeHtmlAttr(contract.jsonPath)}', this.checked)"
                                 >
                                     Separated
                                 </vscode-checkbox>
                             ` : ''}
                         </div>
-                        <div class="contract-path" data-path="${contract.path}">${contract.path}</div>
+                        <div class="contract-path" data-path="${escapeHtmlAttr(contract.path)}">${escapeHtmlAttr(contract.path)}</div>
                     </div>
                     ${contract.enabled ? `
                         <div class="functions-list ${this.collapsedContracts.has(contract.jsonPath) ? 'collapsed' : ''}">
@@ -1454,16 +1465,18 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
             };
             const isEnabled = contract.enabledFunctions?.includes(signature);
 
+            const ePath = escapeHtmlAttr(contract.jsonPath);
+            const eSig = escapeHtmlAttr(signature);
             return `
                         <div class="function-item">
                             <div class="function-header">
                                 <vscode-checkbox
                                     class="function-checkbox"
-                                    data-function="${signature}"
+                                    data-function="${eSig}"
                                     ${isEnabled ? 'checked' : ''}
-                                    onchange="toggleFunction('${contract.jsonPath}', '${signature}', this.checked)"
+                                    onchange="toggleFunction('${ePath}', '${eSig}', this.checked)"
                                 >
-                                    <span class="function-name" title="${signature}">${signature}</span>
+                                    <span class="function-name" title="${eSig}">${eSig}</span>
                                 </vscode-checkbox>
                             </div>
                             ${isEnabled ? `
@@ -1471,46 +1484,46 @@ export class ReconContractsViewProvider implements vscode.WebviewViewProvider {
                                     <div class="function-settings">
                                         <div class="optimized-radio-group" data-type="mode">
                                             <span class="optimized-radio">
-                                                <label class="radio-label ${config.mode === Mode.NORMAL ? 'selected' : ''}" 
-                                                       data-value="normal" 
-                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'normal', this)">
+                                                <label class="radio-label ${config.mode === Mode.NORMAL ? 'selected' : ''}"
+                                                       data-value="normal"
+                                                       onclick="updateFunctionSetting('${ePath}', '${eSig}', 'mode', 'normal', this)">
                                                     Normal
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
-                                                <label class="radio-label ${config.mode === Mode.FAIL ? 'selected' : ''}" 
-                                                       data-value="fail" 
-                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'fail', this)">
+                                                <label class="radio-label ${config.mode === Mode.FAIL ? 'selected' : ''}"
+                                                       data-value="fail"
+                                                       onclick="updateFunctionSetting('${ePath}', '${eSig}', 'mode', 'fail', this)">
                                                     Fail
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
-                                                <label class="radio-label ${config.mode === Mode.CANARY ? 'selected' : ''}" 
-                                                       data-value="canary" 
-                                                       onclick="updateFunctionSetting('${contract.name}', '${signature}', 'mode', 'canary', this)">
+                                                <label class="radio-label ${config.mode === Mode.CANARY ? 'selected' : ''}"
+                                                       data-value="canary"
+                                                       onclick="updateFunctionSetting('${ePath}', '${eSig}', 'mode', 'canary', this)">
                                                     Canary
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
-                                                <label class="radio-label ${config.mode === Mode.CATCH ? 'selected' : ''}" 
-                                                       data-value="catch" 
-                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'mode', 'catch', this)">
+                                                <label class="radio-label ${config.mode === Mode.CATCH ? 'selected' : ''}"
+                                                       data-value="catch"
+                                                       onclick="updateFunctionSetting('${ePath}', '${eSig}', 'mode', 'catch', this)">
                                                     Catch
                                                 </label>
                                             </span>
                                         </div>
                                         <div class="optimized-radio-group" data-type="actor">
                                             <span class="optimized-radio">
-                                                <label class="radio-label ${config.actor === Actor.ACTOR ? 'selected' : ''}" 
-                                                       data-value="actor" 
-                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'actor', 'actor', this)">
+                                                <label class="radio-label ${config.actor === Actor.ACTOR ? 'selected' : ''}"
+                                                       data-value="actor"
+                                                       onclick="updateFunctionSetting('${ePath}', '${eSig}', 'actor', 'actor', this)">
                                                     Actor
                                                 </label>
                                             </span>
                                             <span class="optimized-radio">
-                                                <label class="radio-label ${config.actor === Actor.ADMIN ? 'selected' : ''}" 
-                                                       data-value="admin" 
-                                                       onclick="updateFunctionSetting('${contract.jsonPath}', '${signature}', 'actor', 'admin', this)">
+                                                <label class="radio-label ${config.actor === Actor.ADMIN ? 'selected' : ''}"
+                                                       data-value="admin"
+                                                       onclick="updateFunctionSetting('${ePath}', '${eSig}', 'actor', 'admin', this)">
                                                     Admin
                                                 </label>
                                             </span>

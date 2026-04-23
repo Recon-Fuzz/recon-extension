@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { getEnvironmentPath, getFoundryConfigPath } from '../utils';
 import { ServiceContainer } from '../services/serviceContainer';
 
@@ -36,38 +36,45 @@ export function registerBuildCommands(
                 cancellable: true
             }, async (progress, token) => {
                 return new Promise((resolve, reject) => {
-                    const buildProcess = exec(`forge build ${extraBuildArgs}`.trim(),
-                        {
-                            cwd: foundryRoot,
-                            env: {
-                                ...process.env,
-                                PATH: getEnvironmentPath()
-                            }
-                        },
-                        (error, stdout, stderr) => {
-                            if (error && !token.isCancellationRequested) {
-                                const errorMsg = `Build failed: ${error.message}`;
-                                outputChannel.appendLine(errorMsg);
-                                vscode.window.showErrorMessage(errorMsg);
-                                reject(error);
-                                return;
-                            }
-                            if (stdout) {
-                                outputChannel.appendLine(stdout);
-                            }
-                            if (stderr) {
-                                outputChannel.appendLine('Build warnings:');
-                                outputChannel.appendLine(stderr);
-                            }
-                            if (!token.isCancellationRequested) {
-                                outputChannel.appendLine('Build completed successfully');
-                                vscode.window.showInformationMessage('Build completed successfully');
-                                vscode.commands.executeCommand('recon.refreshContracts');
-                                services.contractWatcherService.checkAndLoadContracts();
-                                resolve(stdout);
-                            }
+                    const args = ['build', ...extraBuildArgs.split(/\s+/).filter(Boolean)];
+                    const buildProcess = spawn('forge', args, {
+                        cwd: foundryRoot,
+                        env: {
+                            ...process.env,
+                            PATH: getEnvironmentPath()
                         }
-                    );
+                    });
+
+                    let stdout = '';
+                    let stderr = '';
+
+                    buildProcess.stdout.on('data', (data: Buffer) => {
+                        const text = data.toString();
+                        stdout += text;
+                        outputChannel.append(text);
+                    });
+
+                    buildProcess.stderr.on('data', (data: Buffer) => {
+                        const text = data.toString();
+                        stderr += text;
+                        outputChannel.append(text);
+                    });
+
+                    buildProcess.on('close', (code: number) => {
+                        if (token.isCancellationRequested) { return; }
+                        if (code !== 0) {
+                            const errorMsg = `Build failed with exit code ${code}`;
+                            outputChannel.appendLine(errorMsg);
+                            vscode.window.showErrorMessage(errorMsg);
+                            reject(new Error(errorMsg));
+                            return;
+                        }
+                        outputChannel.appendLine('Build completed successfully');
+                        vscode.window.showInformationMessage('Build completed successfully');
+                        vscode.commands.executeCommand('recon.refreshContracts');
+                        services.contractWatcherService.checkAndLoadContracts();
+                        resolve(stdout);
+                    });
 
                     token.onCancellationRequested(() => {
                         buildProcess.kill();
