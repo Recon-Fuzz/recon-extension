@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { registerCommands } from './commands';
+import { PropertyToggleCodeLensProvider, getIgnorePatterns, setIgnorePatterns } from './providers/propertyToggleCodeLens';
+import { togglePropertyIgnore, showPropertyStatus, listIgnoredProperties, clearIgnoredProperties, addPropertyToIgnore, removePropertyFromIgnore } from './commands/propertyToggleCommands';
 import { StatusBarService } from './services/statusBarService';
 import { ReconMainViewProvider } from './reconMainView';
 import { ReconContractsViewProvider } from './reconContractsView';
@@ -10,17 +12,28 @@ import { ContractWatcherService } from './services/contractWatcherService';
 import { WorkspaceService } from './services/workspaceService';
 import { LogToFoundryViewProvider } from './tools/logToFoundryView';
 import { ArgusCallGraphEditorProvider } from './argus/argusEditorProvider';
+import { ReconCliService } from './services/reconCliService';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Create services
     const outputService = new OutputService(context);
     const statusBarService = new StatusBarService(context);
     const workspaceService = new WorkspaceService();
+    const reconCliService = new ReconCliService();
 
     // Create view providers
-    const reconMainProvider = new ReconMainViewProvider(context.extensionUri);
+    const reconMainProvider = new ReconMainViewProvider(context.extensionUri, reconCliService);
     const reconContractsProvider = new ReconContractsViewProvider(context.extensionUri, context);
     const coverageViewProvider = new CoverageViewProvider(context.extensionUri);
+
+    // "Install Recon CLI" command — invoked by the install chip on the
+    // Recon Fuzzer radio in the cockpit.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('recon.installReconCli', async () => {
+            const ok = await reconCliService.install();
+            if (ok) { reconMainProvider.refresh(); }
+        })
+    );
 
     // Register WebView Providers
     context.subscriptions.push(
@@ -116,6 +129,58 @@ export async function activate(context: vscode.ExtensionContext) {
             );
         })
     );
+
+    // ===== CodeLens Property Toggle Registration =====
+
+    // Register CodeLens for property toggle
+    const propertyCodeLensProvider = new PropertyToggleCodeLensProvider(context);
+    const codeLensDisposable = vscode.languages.registerCodeLensProvider(
+        { language: 'solidity', scheme: 'file' },
+        propertyCodeLensProvider
+    );
+    context.subscriptions.push(codeLensDisposable);
+
+    // Register toggle command
+    const toggleDisposable = vscode.commands.registerCommand(
+        'recon.togglePropertyIgnore',
+        togglePropertyIgnore
+    );
+    context.subscriptions.push(toggleDisposable);
+
+    // Register status command
+    const statusDisposable = vscode.commands.registerCommand(
+        'recon.showPropertyStatus',
+        showPropertyStatus
+    );
+    context.subscriptions.push(statusDisposable);
+
+    // Register list command
+    const listDisposable = vscode.commands.registerCommand(
+        'recon.listIgnoredProperties',
+        listIgnoredProperties
+    );
+    context.subscriptions.push(listDisposable);
+
+    // Register clear command
+    const clearDisposable = vscode.commands.registerCommand(
+        'recon.clearIgnoredProperties',
+        clearIgnoredProperties
+    );
+    context.subscriptions.push(clearDisposable);
+
+    // Register add property command
+    const addPropertyDisposable = vscode.commands.registerCommand(
+        'recon.addPropertyToIgnore',
+        addPropertyToIgnore
+    );
+    context.subscriptions.push(addPropertyDisposable);
+
+    // Register remove property command
+    const removePropertyDisposable = vscode.commands.registerCommand(
+        'recon.removePropertyFromIgnore',
+        removePropertyFromIgnore
+    );
+    context.subscriptions.push(removePropertyDisposable);
 }
 
 export function deactivate() { }

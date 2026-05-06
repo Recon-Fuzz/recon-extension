@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.0.31] - 17.04.2026
+
+### Added
+- Recon Fuzzer (cockpit option, replay corpus, optional web UI)
+- Recon CLI auto-detect + one-click install via reconup
+- Coverage Reports list Recon Fuzzer outputs from `recon/`
+- `Install Chimera` also adds `recon` and `.recon` to `.gitignore`
+- Property ignore patterns with CodeLens toggle on `*Properties.sol`
+- CPU-aware worker auto-detection (reserved cores, uncap mode)
+- Custom binary paths for Echidna and Medusa, with pre-run tool validation
+- ETA in fuzz progress for Echidna and Medusa
+- "Generate Mock and add to Setup" command
+
+### Fixed
+- Optimization-mode markdown report table
+- Coverage HTML report regenerates when source is newer
+
+## [0.0.30] - 06.11.2025
+
+### Fixed & Improved
+- Various fixes and improvements across the cockpit, fuzzers, and coverage view
+
 ## [0.0.29] - 05.11.2025
 
 ### fix
@@ -77,6 +99,8 @@
 - Coverage report compatibility with new Medusa report format
 - Issue with fuzzer not stopping
 
+[0.0.31]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.31
+[0.0.30]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.30
 [0.0.29]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.29
 [0.0.28]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.28
 [0.0.27]: https://github.com/Recon-Fuzz/recon-extension/releases/tag/v0.0.27

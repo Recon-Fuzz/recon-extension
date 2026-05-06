@@ -15,23 +15,23 @@ export class ChimeraGenerator {
 
     public async findSourceContracts(outDir: string): Promise<ContractMetadata[]> {
         const contracts: ContractMetadata[] = [];
-        
+
         try {
             const entries = await fs.readdir(outDir, { withFileTypes: true });
-            
+
             for (const entry of entries) {
-                if (!entry.isDirectory()) {continue;}
-                
+                if (!entry.isDirectory()) { continue; }
+
                 const contractDir = path.join(outDir, entry.name);
                 const files = await fs.readdir(contractDir);
-                
+
                 for (const file of files) {
-                    if (!file.endsWith('.json')) {continue;}
-                    
+                    if (!file.endsWith('.json')) { continue; }
+
                     const filePath = path.join(contractDir, file);
                     const content = await fs.readFile(filePath, 'utf8');
                     const json = JSON.parse(content);
-                    
+
                     // Fix: properly parse metadata which is already a string
                     if (json.metadata && json.abi) {
                         try {
@@ -59,7 +59,7 @@ export class ChimeraGenerator {
         } catch (error) {
             console.error('Error parsing contracts:', error);
         }
-        
+
         return contracts;
     }
 
@@ -113,7 +113,7 @@ export class ChimeraGenerator {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
                 exec('forge install Recon-Fuzz/chimera',
-                    { 
+                    {
                         cwd: foundryRoot,
                         env: {
                             ...process.env,
@@ -121,8 +121,8 @@ export class ChimeraGenerator {
                         }
                     },
                     (error, stdout, stderr) => {
-                        if (error) {reject(error);}
-                        else {resolve(stdout);}
+                        if (error) { reject(error); }
+                        else { resolve(stdout); }
                     }
                 );
             });
@@ -136,7 +136,7 @@ export class ChimeraGenerator {
             const foundryRoot = await this.getFoundryRoot();
             await new Promise((resolve, reject) => {
                 exec('forge install Recon-Fuzz/setup-helpers',
-                    { 
+                    {
                         cwd: foundryRoot,
                         env: {
                             ...process.env,
@@ -144,8 +144,8 @@ export class ChimeraGenerator {
                         }
                     },
                     (error, stdout, stderr) => {
-                        if (error) {reject(error);}
-                        else {resolve(stdout);}
+                        if (error) { reject(error); }
+                        else { resolve(stdout); }
                     }
                 );
             });
@@ -155,7 +155,9 @@ export class ChimeraGenerator {
     private async updateGitignore(): Promise<void> {
         const foundryRoot = await this.getFoundryRoot();
         const gitignorePath = path.join(foundryRoot, '.gitignore');
-        const newLines = '\n# Coverage files\ncrytic-export\nechidna\nmedusa\n';
+        // `recon`  → Recon Fuzzer corpus + coverage output (--corpus-dir recon)
+        // `.recon` → on-disk run history written by the extension under <ws>/.recon/
+        const requiredEntries = ['crytic-export', 'echidna', 'medusa', 'recon', '.recon'];
         try {
             let content = '';
             try {
@@ -163,13 +165,16 @@ export class ChimeraGenerator {
             } catch {
                 // File doesn't exist, start with empty content
             }
-            if (!content.includes('crytic-export') || 
-                !content.includes('echidna') || 
-                !content.includes('medusa')) {
+            const lines = content.split(/\r?\n/);
+            const present = new Set(lines.map((l) => l.trim()));
+            const missing = requiredEntries.filter((e) => !present.has(e));
+            if (missing.length > 0) {
                 if (content && !content.endsWith('\n')) {
                     content += '\n';
                 }
-                content += newLines;
+                // First time we touch the file, also drop the section header.
+                const needsHeader = !lines.some((l) => l.trim() === '# Coverage files');
+                content += (needsHeader ? '\n# Coverage files\n' : '') + missing.join('\n') + '\n';
                 await fs.writeFile(gitignorePath, content);
             }
         } catch (error) {
@@ -181,13 +186,13 @@ export class ChimeraGenerator {
     private async updateRemappings(): Promise<void> {
         const foundryRoot = await this.getFoundryRoot();
         const remappingsPath = path.join(foundryRoot, 'remappings.txt');
-        
+
         try {
             await fs.access(remappingsPath);
         } catch {
             await new Promise((resolve, reject) => {
                 exec('forge remappings > remappings.txt',
-                    { 
+                    {
                         cwd: foundryRoot,
                         env: {
                             ...process.env,
@@ -195,8 +200,8 @@ export class ChimeraGenerator {
                         }
                     },
                     (error, stdout, stderr) => {
-                        if (error) {reject(error);}
-                        else {resolve(stdout);}
+                        if (error) { reject(error); }
+                        else { resolve(stdout); }
                     }
                 );
             });
@@ -205,7 +210,7 @@ export class ChimeraGenerator {
         const currentRemappings = await fs.readFile(remappingsPath, 'utf8');
         const chimeraMapping = '@chimera/=lib/chimera/src/';
         const setupToolsMapping = '@recon/=lib/setup-helpers/src/';
-        
+
         const remappings = currentRemappings
             .split('\n')
             .map(line => line.trim())
@@ -213,7 +218,7 @@ export class ChimeraGenerator {
 
         remappings.push(chimeraMapping);
         remappings.push(setupToolsMapping);
-        
+
         await fs.writeFile(remappingsPath, remappings.join('\n'));
     }
 }
