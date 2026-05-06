@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { getFoundryConfigPath } from './utils';
 import { EchidnaMode, FuzzerTool } from './types';
 import { getOptimalWorkerCount } from './utils/workerConfig';
-
+import type { ReconCliService } from './services/reconCliService';
 
 export class ReconMainViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
@@ -12,9 +12,14 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
+        private readonly _reconCli: ReconCliService
     ) {
     }
 
+    /** External callers (e.g. after a successful install) trigger a re-render. */
+    public refresh(): void {
+        this._updateWebview();
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -69,6 +74,15 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                 case 'updateHalmosLoop':
                     await vscode.workspace.getConfiguration('recon').update('halmos.loop', message.value, vscode.ConfigurationTarget.Workspace);
                     break;
+                case 'updateGenerateEchidnaCorpus':
+                    await vscode.workspace.getConfiguration('recon').update('reconFuzzer.generateEchidnaCorpus', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
+                case 'updateSkipPureViewFunctions':
+                    await vscode.workspace.getConfiguration('recon').update('reconFuzzer.skipPureViewFunctions', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
+                case 'updateReconFuzzerWebUi':
+                    await vscode.workspace.getConfiguration('recon').update('reconFuzzer.webUi', message.value, vscode.ConfigurationTarget.Workspace);
+                    break;
                 case 'openSettings':
                     vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:Recon-Fuzz.recon');
                     break;
@@ -83,7 +97,12 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('recon.runMedusa', message.value);
                     } else if (defaultFuzzer === FuzzerTool.HALMOS) {
                         vscode.commands.executeCommand('recon.runHalmos', message.value);
+                    } else if (defaultFuzzer === FuzzerTool.RECON_FUZZER) {
+                        vscode.commands.executeCommand('recon.runReconFuzzer', message.value);
                     }
+                    break;
+                case 'installReconCli':
+                    vscode.commands.executeCommand('recon.installReconCli');
                     break;
             }
         });
@@ -268,6 +287,55 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     #fuzz-btn {
                         flex: 1;
                     }
+                    .install-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        margin: -8px 0 16px 0;
+                        padding: 4px 0;
+                    }
+                    .install-hint {
+                        font-size: 11px;
+                        color: var(--vscode-descriptionForeground);
+                    }
+                    .install-chip {
+                        appearance: none;
+                        padding: 2px 10px;
+                        font-size: 10.5px;
+                        font-weight: 600;
+                        letter-spacing: 0.04em;
+                        text-transform: uppercase;
+                        color: #fff;
+                        background: #4493f8;
+                        border: none;
+                        border-radius: 999px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        opacity: 1;
+                        pointer-events: auto;
+                    }
+                    .install-chip:hover { background: #3a7ed8; }
+                    .install-chip[disabled] {
+                        opacity: 0.6;
+                        cursor: progress;
+                        text-transform: none;
+                    }
+                    .disabled-label {
+                        opacity: 0.5;
+                    }
+                    .experimental-tag {
+                        margin-left: 6px;
+                        font-size: 9.5px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.04em;
+                        padding: 1px 5px;
+                        border-radius: 3px;
+                        color: #f6c674;
+                        background: rgba(246, 198, 116, 0.10);
+                        border: 1px solid rgba(246, 198, 116, 0.4);
+                        vertical-align: middle;
+                    }
                 </style>
             </head>
             <body>
@@ -370,39 +438,48 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     if (radioGroup) {
                         radioGroup.addEventListener('change', (e) => {
                             const selectedValue = e.target.value;
-                            
+
                             const echidnaSettings = document.getElementById('echidna-settings');
                             const medusaSettings = document.getElementById('medusa-settings');
                             const halmosSettings = document.getElementById('halmos-settings');
-                            
+                            const reconFuzzerSettings = document.getElementById('recon-fuzzer-settings');
+
                             const fuzzBtn = document.getElementById('fuzz-btn');
                             const btnContent = fuzzBtn?.querySelector('.generate-btn-content');
-                            
+
+                            // Echidna settings panel is shared with Recon Fuzzer (same wire format).
+                            const showEchidna = selectedValue === '${FuzzerTool.ECHIDNA}'
+                                || selectedValue === '${FuzzerTool.RECON_FUZZER}';
+                            const showMedusa = selectedValue === '${FuzzerTool.MEDUSA}';
+                            const showHalmos = selectedValue === '${FuzzerTool.HALMOS}';
+                            const showReconFuzzer = selectedValue === '${FuzzerTool.RECON_FUZZER}';
+
+                            if (echidnaSettings) echidnaSettings.style.display = showEchidna ? '' : 'none';
+                            if (medusaSettings) medusaSettings.style.display = showMedusa ? '' : 'none';
+                            if (halmosSettings) halmosSettings.style.display = showHalmos ? '' : 'none';
+                            if (reconFuzzerSettings) reconFuzzerSettings.style.display = showReconFuzzer ? '' : 'none';
+
                             if (selectedValue === '${FuzzerTool.ECHIDNA}') {
-                                echidnaSettings.style.display = '';
-                                medusaSettings.style.display = 'none';
-                                halmosSettings.style.display = 'none';
                                 setTimeout(() => updateAutoLabel('echidna-workers', 'echidna-auto-label'), 0);
                                 if (btnContent) {
                                     btnContent.innerHTML = '<i class="codicon codicon-beaker"></i>Fuzz with Echidna';
                                 }
                             } else if (selectedValue === '${FuzzerTool.MEDUSA}') {
-                                echidnaSettings.style.display = 'none';
-                                medusaSettings.style.display = '';
-                                halmosSettings.style.display = 'none';
                                 setTimeout(() => updateAutoLabel('medusa-workers', 'medusa-auto-label'), 0);
                                 if (btnContent) {
                                     btnContent.innerHTML = '<i class="codicon codicon-beaker"></i>Fuzz with Medusa';
                                 }
                             } else if (selectedValue === '${FuzzerTool.HALMOS}') {
-                                echidnaSettings.style.display = 'none';
-                                medusaSettings.style.display = 'none';
-                                halmosSettings.style.display = '';
                                 if (btnContent) {
                                     btnContent.innerHTML = '<i class="codicon codicon-beaker"></i>Verify with Halmos';
                                 }
+                            } else if (selectedValue === '${FuzzerTool.RECON_FUZZER}') {
+                                setTimeout(() => updateAutoLabel('echidna-workers', 'echidna-auto-label'), 0);
+                                if (btnContent) {
+                                    btnContent.innerHTML = '<i class="codicon codicon-beaker"></i>Fuzz with Recon Fuzzer';
+                                }
                             }
-                            
+
                             vscode.postMessage({
                                 type: 'updateDefaultFuzzer',
                                 value: selectedValue
@@ -415,6 +492,40 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         updateAutoLabel('echidna-workers', 'echidna-auto-label');
                         updateAutoLabel('medusa-workers', 'medusa-auto-label');
                     }, 0);
+
+                    // Recon Fuzzer: keep Echidna corpus toggle.
+                    document.getElementById('recon-generate-echidna-corpus')?.addEventListener('change', (e) => {
+                        vscode.postMessage({
+                            type: 'updateGenerateEchidnaCorpus',
+                            value: !!e.target.checked
+                        });
+                    });
+
+                    // Recon Fuzzer: skip pure/view (--mutable-only) toggle.
+                    document.getElementById('recon-skip-pure-view')?.addEventListener('change', (e) => {
+                        vscode.postMessage({
+                            type: 'updateSkipPureViewFunctions',
+                            value: !!e.target.checked
+                        });
+                    });
+
+                    // Recon Fuzzer: Web UI (--web) toggle.
+                    document.getElementById('recon-web-ui')?.addEventListener('change', (e) => {
+                        vscode.postMessage({
+                            type: 'updateReconFuzzerWebUi',
+                            value: !!e.target.checked
+                        });
+                    });
+
+                    // Install chip on the disabled "Recon Fuzzer" option.
+                    document.getElementById('install-recon-btn')?.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const chip = e.currentTarget;
+                        chip.setAttribute('disabled', 'true');
+                        chip.textContent = 'installing…';
+                        vscode.postMessage({ type: 'installReconCli' });
+                    });
                 </script>
             </body>
         </html>`;
@@ -455,6 +566,27 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
         const medusaWorkers = config.get<number | null>('medusa.workers', null);
         const medusaOverride = config.get<boolean>('medusa.workersOverride', false);
         const halmosLoop = config.get('halmos.loop', 10);
+        const reconGenerateEchidnaCorpus = config.get<boolean>('reconFuzzer.generateEchidnaCorpus', false);
+        const reconSkipPureViewFunctions = config.get<boolean>('reconFuzzer.skipPureViewFunctions', false);
+        const reconWebUi = config.get<boolean>('reconFuzzer.webUi', false);
+        const reconAvailable = this._reconCli.isAvailableSync();
+        // The Recon Fuzzer setting is only effective if recon is on PATH —
+        // reset to Echidna for the Fuzz button label if it isn't.
+        const effectiveFuzzer =
+            defaultFuzzer === FuzzerTool.RECON_FUZZER && !reconAvailable
+                ? FuzzerTool.ECHIDNA
+                : defaultFuzzer;
+        const fuzzVerb = effectiveFuzzer === FuzzerTool.HALMOS ? 'Verify' : 'Fuzz';
+        const fuzzWith =
+            effectiveFuzzer === FuzzerTool.ECHIDNA ? 'Echidna'
+            : effectiveFuzzer === FuzzerTool.MEDUSA ? 'Medusa'
+            : effectiveFuzzer === FuzzerTool.HALMOS ? 'Halmos'
+            : 'Recon Fuzzer';
+
+        // Recon Fuzzer reuses Echidna's settings panel since the wire format
+        // is identical — make the panel visible for both selections.
+        const showEchidnaSettings =
+            effectiveFuzzer === FuzzerTool.ECHIDNA || effectiveFuzzer === FuzzerTool.RECON_FUZZER;
 
 
         const echidnaAutoWorkers = getOptimalWorkerCount('echidna');
@@ -475,7 +607,7 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     <vscode-button id="fuzz-btn" appearance="primary">
                         <span class="generate-btn-content">
                             <i class="codicon codicon-beaker"></i>
-                            ${defaultFuzzer === FuzzerTool.HALMOS ? "Verify" : "Fuzz"} with ${defaultFuzzer === FuzzerTool.ECHIDNA ? 'Echidna' : defaultFuzzer === FuzzerTool.MEDUSA ? 'Medusa' : 'Halmos'}
+                            ${fuzzVerb} with ${fuzzWith}
                         </span>
                     </vscode-button>
                     <vscode-button id="settings-btn" appearance="secondary">
@@ -484,17 +616,28 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         </span>
                     </vscode-button>
                 </div>
-                
+
                 <div class="fuzzer-selection">
-                    <vscode-radio-group id="fuzzer-selection" value="${defaultFuzzer}">
+                    <vscode-radio-group id="fuzzer-selection" value="${effectiveFuzzer}">
                         <vscode-radio value="${FuzzerTool.ECHIDNA}">Echidna</vscode-radio>
                         <vscode-radio value="${FuzzerTool.MEDUSA}">Medusa</vscode-radio>
                         <vscode-radio value="${FuzzerTool.HALMOS}">Halmos</vscode-radio>
+                        <vscode-radio
+                            value="${FuzzerTool.RECON_FUZZER}"
+                            ${reconAvailable ? '' : 'disabled'}
+                            title="${reconAvailable ? 'Run via the Recon CLI wrapper' : 'Recon CLI not installed — click [install] below'}">
+                            <span class="${reconAvailable ? '' : 'disabled-label'}">Recon Fuzzer</span>
+                        </vscode-radio>
                     </vscode-radio-group>
+                    ${reconAvailable ? '' : `
+                    <div class="install-row">
+                        <span class="install-hint">Recon Fuzzer requires the Recon CLI:</span>
+                        <button type="button" class="install-chip" id="install-recon-btn" title="Install Recon CLI via reconup">install</button>
+                    </div>`}
                 </div>
 
+                <div class="settings-container" ${showEchidnaSettings ? '' : 'style="display: none;"'} id="echidna-settings">
 
-                <div class="settings-container" ${defaultFuzzer !== FuzzerTool.ECHIDNA ? 'style="display: none;"' : ''} id="echidna-settings">
                     <div class="setting-group">
                         <label>Echidna Mode:</label>
                         <vscode-dropdown id="echidna-mode">
@@ -529,8 +672,26 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                     </div>
                 </div>
 
+                <div class="settings-container" ${effectiveFuzzer !== FuzzerTool.RECON_FUZZER ? 'style="display: none;"' : ''} id="recon-fuzzer-settings">
+                    <div class="setting-group">
+                        <vscode-checkbox id="recon-generate-echidna-corpus" ${reconGenerateEchidnaCorpus ? 'checked' : ''}>
+                            Generate Echidna corpus too
+                        </vscode-checkbox>
+                    </div>
+                    <div class="setting-group">
+                        <vscode-checkbox id="recon-skip-pure-view" ${reconSkipPureViewFunctions ? 'checked' : ''}>
+                            Skip pure/view functions
+                        </vscode-checkbox>
+                    </div>
+                    <div class="setting-group">
+                        <vscode-checkbox id="recon-web-ui" ${reconWebUi ? 'checked' : ''}>
+                            Web UI (experimental)
+                        </vscode-checkbox>
+                    </div>
+                </div>
 
-                <div class="settings-container" ${defaultFuzzer !== FuzzerTool.MEDUSA ? 'style="display: none;"' : ''} id="medusa-settings">
+                <div class="settings-container" ${effectiveFuzzer !== FuzzerTool.MEDUSA ? 'style="display: none;"' : ''} id="medusa-settings">
+
                     <div class="setting-group">
                         <label>Test Limit:</label>
                         <vscode-text-field
@@ -554,9 +715,8 @@ export class ReconMainViewProvider implements vscode.WebviewViewProvider {
                         </span>
                     </div>
                 </div>
-                
-                <div class="settings-container" ${defaultFuzzer !== FuzzerTool.HALMOS ? 'style="display: none;"' : ''} id="halmos-settings">
-                    <div class="setting-group">
+                <div class="settings-container" ${effectiveFuzzer !== FuzzerTool.HALMOS ? 'style="display: none;"' : ''} id="halmos-settings">
+                    <div class="setting-group" style="margin-top:12px;">
                         <label>Target:</label>
                         <vscode-text-field
                             id="target-contract"
