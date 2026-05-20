@@ -158,6 +158,7 @@ Recon can be configured through VS Code settings:
 ### Common Issues
 
 - **Fuzzer not found**: Ensure Echidna/Medusa are installed and in your PATH
+- **Fuzzer not found on Windows**: Add Foundry and fuzzer install directories to `terminal.integrated.env.windows.PATH` or the system PATH. Windows PATH entries must be separated with semicolons (`;`), and coverage files should be selected from the Coverage Reports view so Windows paths are passed through the extension safely.
 - **Compilation errors**: Run `forge build` manually to identify issues
 - **No contracts showing**: Check if `out/` directory exists with compiled contracts
 - Halmos log parser may have a few bugs

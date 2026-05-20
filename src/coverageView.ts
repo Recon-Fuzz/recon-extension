@@ -4,6 +4,7 @@ import * as path from 'path';
 import { findSrcDirectory, getFoundryConfigPath } from './utils';
 import { CoverageFile, FuzzerTool } from './types';
 import { readCoverageFileAndProcess } from 'echidna-coverage-parser';
+import { escapeHtmlAttribute } from './platformPaths';
 
 export class CoverageViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
@@ -685,7 +686,7 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
             <body>
                 <div class="coverage-list">
                     ${coverageFiles.map(file => `
-                        <div class="coverage-item">
+                        <div class="coverage-item" data-coverage-path="${escapeHtmlAttribute(file.path)}">
                             <div class="coverage-left">
                                 <i class="codicon codicon-file"></i>
                                 <div class="coverage-info">
@@ -697,9 +698,9 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                             </div>
                             <div class="coverage-actions">
                                 ${file.type === FuzzerTool.ECHIDNA ? `
-                                    <i class="codicon codicon-checklist coverage-stats" onclick="showCoverageStats('${file.path}')" title="Coverage Stats"></i>
+                                    <i class="codicon codicon-checklist coverage-stats" data-action="stats" title="Coverage Stats"></i>
                                 ` : ''}
-                                <i class="codicon codicon-link-external external-link" onclick="openExternal('${file.path}')" title="Open in browser"></i>
+                                <i class="codicon codicon-link-external external-link" data-action="open" title="Open in browser"></i>
                             </div>
                         </div>
                     `).join('')}
@@ -714,8 +715,19 @@ export class CoverageViewProvider implements vscode.WebviewViewProvider {
                                 document.querySelectorAll('.coverage-item').forEach(i => 
                                     i.classList.remove('selected'));
                                 this.classList.add('selected');
-                                const path = this.querySelector('.coverage-actions').lastElementChild.getAttribute('onclick').match(/'([^']+)'/)[1];
-                                selectCoverage(path);
+                                selectCoverage(this.dataset.coveragePath);
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll('.coverage-actions [data-action]').forEach(action => {
+                        action.addEventListener('click', function(event) {
+                            event.stopPropagation();
+                            const path = this.closest('.coverage-item').dataset.coveragePath;
+                            if (this.dataset.action === 'stats') {
+                                showCoverageStats(path);
+                            } else {
+                                openExternal(path);
                             }
                         });
                     });
