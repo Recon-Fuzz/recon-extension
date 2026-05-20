@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { JSDOM } from 'jsdom';
 import { FileBlock } from './types';
 import { execSync } from 'child_process';
+import { combinePathSources, isSourceOrReconCoveragePath } from './platformPaths';
 
 export function getFoundryConfigPath(workspaceRoot: string): string {
     const configPath = vscode.workspace.getConfiguration('recon').get<string>('foundryConfigPath', 'foundry.toml');
@@ -159,16 +160,9 @@ export async function cleanupEchidnaCoverageReport(workspaceRoot: string, conten
     const foundryRoot = path.dirname(foundryConfigPath);
 
     // Filter blocks based on path conditions
-    const filteredBlocks = fileBlocks.filter(block => {
-        const relativePath = path.relative(foundryRoot, block.path);
-        if (relativePath.startsWith(`${srcDirectory}/`)) {
-            return true;
-        }
-        if (relativePath.includes('/recon')) {
-            return true;
-        }
-        return false;
-    });
+    const filteredBlocks = fileBlocks.filter(block =>
+        isSourceOrReconCoveragePath(path.relative(foundryRoot, block.path), srcDirectory)
+    );
 
     // Rebuild HTML with proper structure
     const cleanedHtml = `<!DOCTYPE html>
@@ -197,7 +191,7 @@ export async function cleanupMedusaCoverageReport(content: string): Promise<stri
         const sourceDivs = document.querySelectorAll('div.source-file');
         sourceDivs.forEach(div => {
             const filePath = div.getAttribute('data-file-path') || '';
-            const shouldRemove = !(filePath.startsWith(`${srcDirectory}/`) || filePath.includes('/recon'));
+            const shouldRemove = !isSourceOrReconCoveragePath(filePath, srcDirectory);
             if (shouldRemove) {
                 div.remove();
             }
@@ -222,7 +216,7 @@ export async function cleanupMedusaCoverageReport(content: string): Promise<stri
             const containerDiv = button.nextElementSibling as HTMLElement;
 
             // Check if we should keep this entry
-            const shouldKeep = relativePath.startsWith(`${srcDirectory}/`) || relativePath.includes('/recon');
+            const shouldKeep = isSourceOrReconCoveragePath(relativePath, srcDirectory);
 
             if (!shouldKeep) {
                 // Remove both button and container
@@ -276,15 +270,7 @@ export function getEnvironmentPath(): string {
         } catch (e) {
             console.warn('Failed to get shell PATH:', e);
         }
-    } else {
-        return userPath ? `${userPath}:${process.env.PATH}` : process.env.PATH || '';
     }
 
-    const combined = new Set([
-        ...userPath.split(':'),
-        ...shellPath.split(':'),
-        ...defaultPath.split(':'),
-    ].filter(Boolean));
-
-    return Array.from(combined).join(':');
+    return combinePathSources(userPath, shellPath, defaultPath);
 }
