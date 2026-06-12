@@ -118,7 +118,6 @@ function openReconFuzzerWebPanel(): void {
       retainContextWhenHidden: true,
     }
   );
-  reconFuzzerWebPanel.iconPath = new vscode.ThemeIcon("globe");
   reconFuzzerWebPanel.webview.html = reconFuzzerWebHtml(RECON_FUZZER_WEB_URL);
   reconFuzzerWebPanel.onDidDispose(() => {
     reconFuzzerWebPanel = undefined;
