@@ -68,13 +68,21 @@ export class ChimeraGenerator {
         const chimeraPath = path.join(foundryRoot, 'lib', 'chimera');
         const setupHelpersPath = path.join(foundryRoot, 'lib', 'setup-helpers');
 
-        // Install Chimera
-        progress.report({ message: "Installing Chimera..." });
-        await this.installChimera(chimeraPath);
+        // Install Chimera + Setup Helpers. If these fail (e.g. no network, forge
+        // not on PATH) we still want to scaffold the setup, so surface the error
+        // but carry on rather than aborting the whole generation.
+        try {
+            progress.report({ message: "Installing Chimera..." });
+            await this.installChimera(chimeraPath);
 
-        // Install Chimera
-        progress.report({ message: "Installing Setup Helpers..." });
-        await this.installSetupHelpers(setupHelpersPath);
+            progress.report({ message: "Installing Setup Helpers..." });
+            await this.installSetupHelpers(setupHelpersPath);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(
+                `Failed to install Chimera/Setup Helpers: ${message}. Continuing with setup generation — install them manually if needed.`
+            );
+        }
 
         // Handle remappings
         progress.report({ message: "Updating remappings..." });
