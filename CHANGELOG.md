@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.31] - 17.04.2026
+## [0.0.31] - 12.06.2026
 
 ### Added
 - Recon Fuzzer (cockpit option, replay corpus, optional web UI)
@@ -16,6 +16,7 @@
 ### Fixed
 - Optimization-mode markdown report table
 - Coverage HTML report regenerates when source is newer
+- Fixed a bug that prevented scaffolding when installation of dependency was failing
 
 ## [0.0.30] - 06.11.2025
 
