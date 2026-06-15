@@ -163,9 +163,8 @@ export class ChimeraGenerator {
     private async updateGitignore(): Promise<void> {
         const foundryRoot = await this.getFoundryRoot();
         const gitignorePath = path.join(foundryRoot, '.gitignore');
-        // `recon`  → Recon Fuzzer corpus + coverage output (--corpus-dir recon)
         // `.recon` → on-disk run history written by the extension under <ws>/.recon/
-        const requiredEntries = ['crytic-export', 'echidna', 'medusa', 'recon', '.recon'];
+        const requiredEntries = ['crytic-export', 'echidna', 'medusa', '.recon'];
         try {
             let content = '';
             try {
