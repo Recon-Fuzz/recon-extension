@@ -2,7 +2,7 @@
   "name": "recon",
   "displayName": "Recon",
   "description": "Scaffold and run Invariant Tests with Medusa, Echidna and Halmos, automatically debug broken properties with Foundry",
-  "version": "0.0.31",
+  "version": "0.0.32",
   "license": "GPL-2.0",
   "publisher": "Recon-Fuzz",
   "repository": {
