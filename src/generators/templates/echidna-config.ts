@@ -10,7 +10,7 @@ const symExecEnabled = vscode.workspace
     .get<boolean>('echidna.symExec', true);
 
 export const echidnaConfigTemplate = handlebars.compile(`testMode: "assertion"
-prefix: "echidna_"
+prefix: "optimize_"
 coverage: true
 corpusDir: "echidna"
 balanceAddr: 0x1043561a8829300000
