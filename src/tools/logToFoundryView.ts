@@ -9,6 +9,8 @@ import {
   FuzzingResults,
 } from "@recon-fuzz/log-parser";
 
+import { filterIgnoredProperties } from "../utils/propertyFilter";
+
 interface VmOptions {
   prank: boolean;
   roll: boolean;
@@ -96,11 +98,23 @@ export class LogToFoundryViewProvider {
         fuzzer.toUpperCase() as unknown as Fuzzer
       );
 
+      // Track original count before filtering
+      const originalCount = jobStats.brokenProperties?.length || 0;
+
+      // Filter out ignored properties
+      jobStats.brokenProperties = filterIgnoredProperties(jobStats.brokenProperties);
+
       if (
         !jobStats.brokenProperties ||
         jobStats.brokenProperties.length === 0
       ) {
-        return { brokenProperties: [], traces: [], generatedCode: [] };
+        return { 
+          brokenProperties: [], 
+          traces: [], 
+          generatedCode: [],
+          originalCount,
+          filteredCount: originalCount,
+        };
       }
 
       // Extract traces and prepare VM data for each property
@@ -157,6 +171,8 @@ export class LogToFoundryViewProvider {
         useVmData,
         generatedCode,
         fuzzer,
+        originalCount,
+        filteredCount: originalCount - jobStats.brokenProperties.length,
       };
     } catch (error) {
       console.error("Error converting log:", error);
@@ -336,6 +352,33 @@ export class LogToFoundryViewProvider {
                     .results-title {
                         font-size: 20px;
                         font-weight: bold;
+                    }
+                    
+                    .results-title.filtered {
+                        color: #f0ad4e;
+                    }
+                    
+                    .filtered-info {
+                        background: rgba(240, 173, 78, 0.15);
+                        border: 1px solid rgba(240, 173, 78, 0.3);
+                        border-radius: 6px;
+                        padding: 12px 16px;
+                        margin-top: 10px;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+                    
+                    .filtered-info .icon {
+                        font-size: 18px;
+                    }
+                    
+                    .filtered-info .text {
+                        color: #ccc;
+                    }
+                    
+                    .filtered-info .text strong {
+                        color: #f0ad4e;
                     }
                     
                     .copy-all-btn {
@@ -673,14 +716,54 @@ export class LogToFoundryViewProvider {
                     
                     // Render properties
                     function renderProperties() {
-                        if (!currentResults || !currentResults.brokenProperties.length) {
+                        if (!currentResults) {
                             resultsDiv.classList.add('hidden');
                             return;
                         }
                         
                         const count = currentResults.brokenProperties.length;
-                        resultsTitle.textContent = \`\${count} Broken Propert\${count === 1 ? 'y' : 'ies'}\`;
+                        const originalCount = currentResults.originalCount || count;
+                        const filteredCount = currentResults.filteredCount || 0;
+                        
+                        // If no properties at all (nothing found, nothing filtered)
+                        if (count === 0 && filteredCount === 0) {
+                            resultsDiv.classList.add('hidden');
+                            return;
+                        }
+                        
+                        // Reset filtered class
+                        resultsTitle.classList.remove('filtered');
+                        
+                        // Show appropriate message
+                        if (filteredCount > 0 && count === 0) {
+                            // All properties were filtered out
+                            resultsTitle.classList.add('filtered');
+                            resultsTitle.textContent = 'Results';
+                            propertiesList.innerHTML = \`
+                                <div class="filtered-info">
+                                    <span class="icon">⚠️</span>
+                                    <span class="text">
+                                        <strong>\${originalCount} broken propert\${originalCount === 1 ? 'y' : 'ies'}</strong> 
+                                        matched your ignore patterns and \${originalCount === 1 ? 'was' : 'were'} filtered out.
+                                        <br>Edit <em>recon.ignorePropertyPatterns</em> in settings to adjust.
+                                    </span>
+                                </div>
+                            \`;
+                            document.getElementById('copy-all-btn').style.display = 'none';
+                            resultsDiv.classList.remove('hidden');
+                            return;
+                        } else if (filteredCount > 0) {
+                            // Some properties filtered, some remain
+                            resultsTitle.classList.add('filtered');
+                            resultsTitle.textContent = \`\${count} Broken Propert\${count === 1 ? 'y' : 'ies'} (\${filteredCount} filtered)\`;
+                        } else {
+                            // No filtering applied
+                            resultsTitle.textContent = \`\${count} Broken Propert\${count === 1 ? 'y' : 'ies'}\`;
+                        }
                         resultsDiv.classList.remove('hidden');
+                        
+                        // Show copy-all button
+                        document.getElementById('copy-all-btn').style.display = '';
                         
                         // Initialize state arrays
                         showBrokenProp = currentResults.brokenProperties.map((_, index) => ({ id: index, show: false }));

@@ -8,13 +8,15 @@ export enum Actor {
 export enum Mode {
     NORMAL = 'normal',
     FAIL = 'fail',
+    CANARY = 'canary',
     CATCH = 'catch'
 }
 
 export enum FuzzerTool {
     ECHIDNA = 'Echidna',
     MEDUSA = 'Medusa',
-    HALMOS = 'Halmos'
+    HALMOS = 'Halmos',
+    RECON_FUZZER = 'Recon Fuzzer'
 }
 
 export interface CoverageFile {
@@ -78,6 +80,7 @@ export interface TestFunction {
 export interface FunctionDefinitionParams {
     contractName: string;
     contractPath: string;
+    jsonPath?: string; 
     functionName: string;
     abi: Abi;
     actor: Actor;

@@ -11,6 +11,10 @@ import {
   getEnvironmentPath,
 } from "../utils";
 import { ServiceContainer } from "../services/serviceContainer";
+import { ToolValidationService } from "../services/toolValidationService";
+import { formatDuration } from "../utils";
+import { filterIgnoredProperties } from "../utils/propertyFilter";
+import { getWorkerConfig } from "../utils/workerConfig"
 
 export function registerFuzzingCommands(
   context: vscode.ExtensionContext,
@@ -45,16 +49,141 @@ export function registerFuzzingCommands(
       }
     )
   );
+
+  // Register Recon Fuzzer command — same wire format as Echidna, just run via
+  // the `recon fuzz` wrapper so the user gets Recon's value-add on top.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "recon.runReconFuzzer",
+      async (target?: string) => {
+        await runFuzzer(Fuzzer.ECHIDNA, services, target, { useReconWrapper: true });
+      }
+    )
+  );
+
+  // Right-click "Replay corpus with Recon Fuzzer" on a .txt file under recon/.
+  // Appends --replay <absolute path> to the same Recon Fuzzer command.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "recon.replayReconFuzzer",
+      async (resource?: vscode.Uri) => {
+        let target: vscode.Uri | undefined = resource;
+        if (!target) {
+          const active = vscode.window.activeTextEditor;
+          if (active && active.document.uri.scheme === "file") {
+            target = active.document.uri;
+          }
+        }
+        if (!target) {
+          vscode.window.showErrorMessage(
+            "Recon: select a corpus .txt file under recon/ to replay."
+          );
+          return;
+        }
+        await runFuzzer(Fuzzer.ECHIDNA, services, undefined, {
+          useReconWrapper: true,
+          replayFile: target.fsPath,
+        });
+      }
+    )
+  );
+}
+
+interface RunFuzzerOptions {
+  /** When true, swap `echidna` for `recon fuzz` (output is identical). */
+  useReconWrapper?: boolean;
+  /** Absolute path of a corpus .txt file to replay (Recon Fuzzer only). */
+  replayFile?: string;
+}
+
+const RECON_FUZZER_WEB_URL = "https://recon-fuzzer.vercel.app/";
+
+let reconFuzzerWebPanel: vscode.WebviewPanel | undefined;
+
+/**
+ * Open (or reveal) a side webview panel that embeds the Recon Fuzzer web UI
+ * via an iframe. Stays in sync with the running `--web` instance.
+ */
+function openReconFuzzerWebPanel(): void {
+  if (reconFuzzerWebPanel) {
+    reconFuzzerWebPanel.reveal(vscode.ViewColumn.Beside, true);
+    return;
+  }
+  reconFuzzerWebPanel = vscode.window.createWebviewPanel(
+    "reconFuzzerWeb",
+    "Recon Fuzzer · Web UI",
+    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+    }
+  );
+  reconFuzzerWebPanel.webview.html = reconFuzzerWebHtml(RECON_FUZZER_WEB_URL);
+  reconFuzzerWebPanel.onDidDispose(() => {
+    reconFuzzerWebPanel = undefined;
+  });
+}
+
+function reconFuzzerWebHtml(url: string): string {
+  // VS Code webviews can embed external URLs via an <iframe> as long as the
+  // frame-src CSP allows the host. Keep the iframe full-bleed.
+  const csp = [
+    "default-src 'none'",
+    "style-src 'unsafe-inline'",
+    "frame-src https://recon-fuzzer.vercel.app https://*.vercel.app https:",
+    "img-src https: data:",
+  ].join("; ");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}" />
+  <title>Recon Fuzzer · Web UI</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0e0e10; }
+    iframe { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+</head>
+<body>
+  <iframe src="${url}" allow="clipboard-write; clipboard-read"></iframe>
+</body>
+</html>`;
 }
 
 async function runFuzzer(
   fuzzerType: Fuzzer,
   services: ServiceContainer,
-  target: string = "CryticTester"
+  target: string = "CryticTester",
+  opts: RunFuzzerOptions = {}
 ): Promise<void> {
   if (!vscode.workspace.workspaceFolders) {
     vscode.window.showErrorMessage("Please open a workspace first");
     return;
+  }
+
+  // Validate that the fuzzer tool is available (echidna and medusa)
+  let validatedCommand: string | undefined;
+  if (fuzzerType === Fuzzer.ECHIDNA || fuzzerType === Fuzzer.MEDUSA) {
+    const validationService = new ToolValidationService();
+    const fuzzerName = fuzzerType === Fuzzer.ECHIDNA ? "echidna" : "medusa";
+    const validation = await validationService.validateFuzzer(fuzzerName);
+
+    if (!validation.isValid) {
+      const result = await vscode.window.showWarningMessage(
+        validation.error || `${fuzzerName} not found`,
+        "Open Settings",
+        "Cancel"
+      );
+
+      if (result === "Open Settings") {
+        vscode.commands.executeCommand(
+          "workbench.action.openSettings",
+          `recon.${fuzzerName}.path`
+        );
+      }
+      return;
+    }
+    validatedCommand = validation.command;
   }
 
   const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
@@ -62,24 +191,64 @@ async function runFuzzer(
   const foundryRoot = path.dirname(foundryConfigPath);
 
   let command: string;
+  let webUiEnabled = false;
 
   if (fuzzerType === Fuzzer.ECHIDNA) {
     const config = vscode.workspace.getConfiguration("recon.echidna");
-    const workers = config.get<number>("workers", 8);
+    // const workers = config.get<number>("workers", 8); prev default, now dynamic
+    const workers = getWorkerConfig('echidna');
     const testLimit = config.get<number>("testLimit", 1000000);
     const mode = config.get<string>("mode", "assertion");
 
-    command = `echidna . --contract ${
+    // Pick the binary: recon fuzz wrapper, the validated custom echidna
+    // path, or `echidna` from PATH.
+    const binary = opts.useReconWrapper ? "recon fuzz" : (validatedCommand || "echidna");
+    // Recon Fuzzer writes corpus + coverage to ./recon/ so we can tell its
+    // output apart from raw Echidna's ./echidna/ output. The HTML reports
+    // recon produces are already cleaned, so we won't need a cleanup pass.
+    //
+    // When the user opts in to "generate echidna corpus" we keep Echidna's
+    // own corpus too (--recon-corpus-dir). Otherwise the combined Recon
+    // corpus replaces it (--corpus-dir).
+    let corpusFlag = "";
+    let mutableOnlyFlag = "";
+    let webFlag = "";
+    if (opts.useReconWrapper) {
+      const reconCfg = vscode.workspace.getConfiguration("recon.reconFuzzer");
+      const keepEchidnaCorpus = reconCfg.get<boolean>("generateEchidnaCorpus", false);
+      corpusFlag = keepEchidnaCorpus
+        ? " --recon-corpus-dir recon"
+        : " --corpus-dir recon";
+      if (reconCfg.get<boolean>("skipPureViewFunctions", false)) {
+        mutableOnlyFlag = " --mutable-only";
+      }
+      // --web is interactive and incompatible with a one-shot replay run, so
+      // skip it for replays even if the setting is enabled.
+      if (reconCfg.get<boolean>("webUi", false) && !opts.replayFile) {
+        webFlag = " --web --no-open";
+        webUiEnabled = true;
+      }
+    }
+    const replayFlag =
+      opts.useReconWrapper && opts.replayFile
+        ? ` --replay "${opts.replayFile.replace(/"/g, '\\"')}"`
+        : "";
+    command = `${binary} . --contract ${
       target || "CryticTester"
     } --config echidna.yaml --format text --workers ${
       workers || 10
-    } --test-limit ${testLimit} --test-mode ${mode}`;
+    } --test-limit ${testLimit} --test-mode ${mode}${corpusFlag}${mutableOnlyFlag}${webFlag}${replayFlag}`;
+
+    if (webUiEnabled) {
+      openReconFuzzerWebPanel();
+    }
   } else if (fuzzerType === Fuzzer.MEDUSA) {
     const config = vscode.workspace.getConfiguration("recon.medusa");
-    const workers = config.get<number>("workers", 10);
+    // const workers = config.get<number>("workers", 10); prev default, now dynamic
+    const workers = getWorkerConfig('medusa');
     const testLimit = config.get<number>("testLimit", 0);
 
-    command = `medusa fuzz --workers ${
+    command = `${validatedCommand || "medusa"} fuzz --workers ${
       workers || 10
     } --test-limit ${testLimit}`;
     if (target !== "CryticTester") {
@@ -89,44 +258,55 @@ async function runFuzzer(
     const config = vscode.workspace.getConfiguration("recon.halmos");
     const loop = config.get<number>("loop", 256);
 
-    command = `halmos --match-contract ${
-      target || "CryticTester"
-    } -vv --solver-timeout-assertion 0 --loop ${loop} `;
+    command = `halmos --match-contract ${target || "CryticTester"
+      } -vv --solver-timeout-assertion 0 --loop ${loop} `;
   }
 
-  // Create output channel for live feedback
-  const outputChannel = services.outputService.createFuzzerOutputChannel(
-    fuzzerType === Fuzzer.ECHIDNA
+  // Display label distinguishes the Recon-wrapped Echidna from raw Echidna,
+  // and tags replay runs separately for the output channel + progress UI.
+  const displayName =
+    opts.useReconWrapper && fuzzerType === Fuzzer.ECHIDNA
+      ? opts.replayFile
+        ? `Recon Fuzzer (replay)`
+        : "Recon Fuzzer"
+      : fuzzerType === Fuzzer.ECHIDNA
       ? "Echidna"
       : fuzzerType === Fuzzer.MEDUSA
       ? "Medusa"
-      : "Halmos"
-  );
+      : "Halmos";
+
+  // Create output channel for live feedback
+  const outputChannel = services.outputService.createFuzzerOutputChannel(displayName);
   outputChannel.show();
 
   let output = "";
   let processCompleted = false;
   let childProcess: any = null;
   let hasEnoughData = false;
+  // Web UI mode is interactive (long-lived web server). Skip the test-counter
+  // polling, the wait-for-shutdown-message loop, and the report flow — the
+  // user drives everything from the embedded web view and stops via Cancel.
+  const isWebUiRun = !!webUiEnabled;
 
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title:
-        fuzzerType === Fuzzer.ECHIDNA
-          ? "Echidna"
-          : fuzzerType === Fuzzer.MEDUSA
-          ? "Medusa"
-          : "Halmos",
+      title: isWebUiRun ? `${displayName} (Web UI)` : displayName,
       cancellable: true,
     },
     async (progress, token) => {
+      const startTime = Date.now();
       return new Promise<void>((resolve, reject) => {
+        if (isWebUiRun) {
+          progress.report({ message: `Web UI running · open ${RECON_FUZZER_WEB_URL} — Cancel to stop` });
+        }
+
         childProcess = require("child_process").spawn(command, {
           cwd: foundryRoot,
           shell: true,
-          detached: true,
-          ...(process.platform !== "win32" && { stdio: "pipe" }),
+          ...(process.platform === "win32" 
+            ? { stdio: "pipe", detached: false }
+            : { stdio: "pipe", detached: true }),
           env: {
             ...process.env,
             PATH: getEnvironmentPath(),
@@ -139,24 +319,31 @@ async function runFuzzer(
             processCompleted = true;
             resolve();
 
-            try {
-              if (process.platform === "win32") {
-                require("child_process").execSync(
-                  `taskkill /pid ${childProcess.pid} /T /F`,
-                  { stdio: "ignore" }
-                );
-              } else {
-                if (reason === "stopped by user") {
-                  if (fuzzerType === Fuzzer.MEDUSA) {
-                    process.kill(-childProcess.pid, "SIGINT");
-                  } else {
-                    process.kill(-childProcess.pid, "SIGTERM");
-                  }
+            if (process.platform === "win32") {
+              require("child_process").execSync(
+                `taskkill /pid ${childProcess.pid} /T /F`,
+                { stdio: "ignore" }
+              );
+            } else {
+              if (reason === "stopped by user") {
+                if (fuzzerType === Fuzzer.MEDUSA) {
+                  process.kill(-childProcess.pid, "SIGINT");
+                } else {
+                  process.kill(-childProcess.pid, "SIGTERM");
                 }
               }
+            }
 
-              outputChannel.appendLine(`\n${fuzzerType} process ${reason}`);
+            outputChannel.appendLine(`\n${displayName.toUpperCase()} process ${reason}`);
 
+            // Web UI runs are interactive — no shrinking step, no broken
+            // properties report, just close cleanly.
+            if (isWebUiRun) {
+              vscode.window.showInformationMessage(`${displayName} ${reason}`);
+              return;
+            }
+
+            try {
               // Wait for completion signals for each fuzzer
               if (fuzzerType === Fuzzer.ECHIDNA) {
                 // Wait for "Saving test reproducers" with 1 minute timeout
@@ -198,11 +385,67 @@ async function runFuzzer(
                     }
                   }
                   const results = processLogs(output, fuzzerType);
-                  const reportContent = generateJobMD(
+                  let reportContent = generateJobMD(
                     fuzzerType,
                     output,
                     vscode.workspace.name || "Recon Project"
                   );
+
+                  // Fix table header and rows for optimization mode
+                  if (fuzzerType === Fuzzer.ECHIDNA) {
+                    const echidnaMode = vscode.workspace
+                      .getConfiguration("recon.echidna")
+                      .get<string>("mode", "assertion");
+                    if (echidnaMode === "optimization") {
+                      // Replace table header
+                      reportContent = reportContent.replace(
+                        "| Property | Status |",
+                        "| Property | Max Value |"
+                      );
+
+                      // Parse optimization results from raw output
+                      const optimizationResults: { property: string; value: string }[] = [];
+                      const lines = output.split('\n');
+                      for (const line of lines) {
+                        if (line.includes(': max value:')) {
+                          const parts = line.split(': max value:');
+                          const property = parts[0].trim();
+                          const value = parts[1].trim();
+                          optimizationResults.push({ property, value });
+                        }
+                      }
+
+                      // Build table rows with dynamic column widths
+                      if (optimizationResults.length > 0) {
+                        // Calculate column widths
+                        const propertyHeader = "Property";
+                        const valueHeader = "Max Value";
+                        const maxPropertyLen = Math.max(
+                          propertyHeader.length,
+                          ...optimizationResults.map(r => r.property.length)
+                        );
+                        const maxValueLen = Math.max(
+                          valueHeader.length,
+                          ...optimizationResults.map(r => r.value.length)
+                        );
+
+                        // Build dynamic table
+                        const headerRow = `| ${propertyHeader.padEnd(maxPropertyLen)} | ${valueHeader.padEnd(maxValueLen)} |`;
+                        const separatorRow = `|${'-'.repeat(maxPropertyLen + 2)}|${'-'.repeat(maxValueLen + 2)}|`;
+                        const tableRows = optimizationResults
+                          .map(r => `| ${r.property.padEnd(maxPropertyLen)} | ${r.value.padEnd(maxValueLen)} |`)
+                          .join('\n');
+
+                        // Replace all empty tables by splitting and rejoining
+                        const fullTable = `${headerRow}\n${separatorRow}\n${tableRows}`;
+                        // The original separator has 10 dashes for Property and 8 for Status
+                        // After header replacement, it's still |----------|--------|
+                        const emptyTable = "| Property | Max Value |\n|----------|--------|";
+                        const parts = reportContent.split(emptyTable);
+                        reportContent = parts.join(fullTable);
+                      }
+                    }
+                  }
 
                   const showReport = await vscode.window.showInformationMessage(
                     `Fuzzing completed. View detailed report?`,
@@ -222,8 +465,9 @@ async function runFuzzer(
                   }
 
                   // Handle broken properties
-                  if (results.brokenProperties.length > 0) {
-                    const repros = results.brokenProperties
+                  const filteredProperties = filterIgnoredProperties(results.brokenProperties);
+                  if (filteredProperties.length > 0) {
+                    const repros = filteredProperties
                       .map((prop) =>
                         prepareTrace(
                           fuzzerType,
@@ -235,7 +479,7 @@ async function runFuzzer(
                       .join("\n\n");
 
                     const answer = await vscode.window.showInformationMessage(
-                      `Found ${results.brokenProperties.length} broken properties. Save Foundry reproductions?`,
+                      `Found ${filteredProperties.length} broken properties. Save Foundry reproductions?`,
                       { modal: true },
                       "Yes",
                       "No"
@@ -284,7 +528,7 @@ async function runFuzzer(
                   }
 
                   vscode.window.showInformationMessage(
-                    `${fuzzerType} ${reason}: ${results.passed} passed, ${results.failed} failed`
+                    `${displayName} ${reason}: ${results.passed} passed, ${results.failed} failed`
                   );
                 } catch (error) {
                   console.error("Error generating report:", error);
@@ -292,7 +536,7 @@ async function runFuzzer(
                 }
               } else {
                 vscode.window.showInformationMessage(
-                  `${fuzzerType} ${reason} (not enough data for report)`
+                  `${displayName} ${reason} (not enough data for report)`
                 );
               }
             } catch (err) {
@@ -316,7 +560,9 @@ async function runFuzzer(
           output += text;
           outputChannel.append(text);
 
-          // Parse fuzzer-specific status
+          // Parse fuzzer-specific status — skip for Web UI runs since the
+          // user is watching live state in the embedded web panel.
+          if (isWebUiRun) { return; }
           if (fuzzerType === Fuzzer.ECHIDNA) {
             if (text.includes("[status] tests:")) {
               hasEnoughData = true;
@@ -336,8 +582,17 @@ async function runFuzzer(
                   percentage - (progress as any).lastPercentage || 0;
                 (progress as any).lastPercentage = percentage;
 
+                let etaStr = "";
+                if (current > 0) {
+                  const elapsedSeconds = (Date.now() - startTime) / 1000;
+                  const testsPerSecond = current / elapsedSeconds;
+                  const remainingTests = max - current;
+                  const remainingSeconds = remainingTests / testsPerSecond;
+                  etaStr = `ETA: ${formatDuration(remainingSeconds)}`;
+                }
+
                 progress.report({
-                  message: `Tests: ${failedTests}/${totalTests} | Progress: ${currentFuzz}/${maxFuzz} | Corpus: ${corpusSize}`,
+                  message: `Tests: ${etaStr} | ${failedTests}/${totalTests} | Progress: ${currentFuzz}/${maxFuzz} | Corpus: ${corpusSize}`,
                   increment: Math.max(0, increment),
                 });
               }
@@ -351,22 +606,33 @@ async function runFuzzer(
 
               if (corpusMatch && failuresMatch && callsMatch) {
                 const corpus = corpusMatch[1];
-                const [, failures, totalTests] = failuresMatch;
+                const [, failures, totalTestsStr] = failuresMatch;
+                const totalTests = parseInt(totalTestsStr);
                 const calls = callsMatch[1];
-                const testLimit = vscode.workspace
+                const currentCalls = parseInt(calls);
+                let testLimit = vscode.workspace
                   .getConfiguration("recon.medusa")
                   .get<number>("testLimit", 0);
 
                 const percentage =
                   testLimit > 0
-                    ? Math.min((parseInt(calls) / testLimit) * 100, 100)
+                    ? Math.min((currentCalls / testLimit) * 100, 100)
                     : 0;
                 const increment =
                   percentage - (progress as any).lastPercentage || 0;
                 (progress as any).lastPercentage = percentage;
 
+                let etaStr = "";
+                if (testLimit > 0 && currentCalls > 0) {
+                  const elapsedSeconds = (Date.now() - startTime) / 1000;
+                  const callsPerSecond = currentCalls / elapsedSeconds;
+                  const remainingCalls = testLimit - currentCalls;
+                  const remainingSeconds = remainingCalls / callsPerSecond;
+                  etaStr = `ETA: ${formatDuration(remainingSeconds)}`;
+                }
+
                 progress.report({
-                  message: `Tests: ${failures}/${totalTests} | Calls: ${calls} | Corpus: ${corpus}`,
+                  message: `Tests: ${etaStr} | ${failures}/${totalTestsStr} | Calls: ${calls} | Corpus: ${corpus}`,
                   increment: Math.max(0, increment),
                 });
               }

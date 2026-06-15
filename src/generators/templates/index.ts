@@ -5,6 +5,7 @@ import { beforeAfterTemplate } from './before-after';
 import { cryticTesterTemplate } from './crytic-tester';
 import { cryticToFoundryTemplate } from './crytic-to-foundry';
 import { propertiesTemplate } from './properties';
+import { canaryStorageTemplate } from './canary-storage';
 import { setupTemplate } from './setup';
 import { targetFunctionsTemplate } from './target-functions';
 import { adminTargetsTemplate } from './targets/admin-targets';
@@ -20,6 +21,7 @@ export {
     cryticTesterTemplate,
     cryticToFoundryTemplate,
     propertiesTemplate,
+    canaryStorageTemplate,
     setupTemplate,
     targetFunctionsTemplate,
     adminTargetsTemplate,

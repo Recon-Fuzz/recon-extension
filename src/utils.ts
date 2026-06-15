@@ -288,3 +288,41 @@ export function getEnvironmentPath(): string {
 
     return Array.from(combined).join(':');
 }
+
+export async function checkCommandExists(command: string): Promise<boolean> {
+    try {
+        const checkCommand = process.platform === 'win32' ? 'where' : 'which';
+        execSync(`${checkCommand} ${command}`, {
+            encoding: 'utf-8',
+            stdio: 'pipe',
+            env: {
+                ...process.env,
+                PATH: getEnvironmentPath()
+            },
+        });
+       return true; 
+    } catch (error) {
+       return false; 
+    }
+}
+
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) {
+    return "0s";
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+
+  const parts = [];
+  if (h > 0) {
+    parts.push(`${h}h`);
+  }
+  if (m > 0 || (h > 0 && s > 0)) {
+    parts.push(`${m}m`);
+  }
+  if (s > 0 || parts.length === 0) {
+    parts.push(`${s}s`);
+  }
+  return parts.join(" ");
+}
