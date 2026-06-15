@@ -174,13 +174,7 @@ export function registerHelpers(handlebars: typeof Handlebars) {
         contractName = camel(contractName);
 
         return `
-    function canary_${contractName}_${abi.name}(${abi.inputs
-                    .map(
-                        (input: ParamDefinition) =>
-                            `${conditionallyAddMemoryLocation(input.type, extractType(input))} ${input.name
-                            }`
-                    )
-                    .join(", ")}) public {
+    function canary_${contractName}_${abi.name}() public {
         t(!${abi.name}Canary, "canary_${contractName}_${abi.name}");
     }`;
     });
