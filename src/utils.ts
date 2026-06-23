@@ -8,7 +8,7 @@ import { execSync } from 'child_process';
 
 export function getFoundryConfigPath(workspaceRoot: string): string {
     const configPath = vscode.workspace.getConfiguration('recon').get<string>('foundryConfigPath', 'foundry.toml');
-    return path.join(workspaceRoot, configPath);
+    return path.isAbsolute(configPath) ? configPath : path.join(workspaceRoot, configPath);
 }
 
 export async function findOutputDirectory(workspaceRoot: string): Promise<string> {
@@ -19,7 +19,7 @@ export async function findOutputDirectory(workspaceRoot: string): Promise<string
         if (match) {
             // If path is absolute, use it directly; otherwise, make it relative to foundry.toml location
             const outPath = match[1];
-            return path.join(path.dirname(foundryConfigPath), outPath);
+            return path.isAbsolute(outPath) ? outPath : path.join(path.dirname(foundryConfigPath), outPath);
         }
         return path.join(path.dirname(foundryConfigPath), 'out');
     } catch {
@@ -126,6 +126,25 @@ export const getUid = () => {
     return Math.random().toString(36).substring(2, 6);
 };
 
+function toPosixPath(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
+}
+
+function trimSlashes(filePath: string): string {
+    return toPosixPath(filePath).replace(/^\/+|\/+$/g, '');
+}
+
+function isSourceOrReconPath(filePath: string): boolean {
+    const normalizedPath = trimSlashes(filePath);
+    const normalizedSrcDirectory = trimSlashes(srcDirectory);
+
+    return normalizedPath === normalizedSrcDirectory ||
+        normalizedPath.startsWith(`${normalizedSrcDirectory}/`) ||
+        normalizedPath.includes(`/${normalizedSrcDirectory}/`) ||
+        normalizedPath.endsWith(`/${normalizedSrcDirectory}`) ||
+        normalizedPath.split('/').includes('recon');
+}
+
 
 export async function cleanupEchidnaCoverageReport(workspaceRoot: string, content: string): Promise<string> {
     const dom = new JSDOM(content, {
@@ -161,13 +180,7 @@ export async function cleanupEchidnaCoverageReport(workspaceRoot: string, conten
     // Filter blocks based on path conditions
     const filteredBlocks = fileBlocks.filter(block => {
         const relativePath = path.relative(foundryRoot, block.path);
-        if (relativePath.startsWith(`${srcDirectory}/`)) {
-            return true;
-        }
-        if (relativePath.includes('/recon')) {
-            return true;
-        }
-        return false;
+        return isSourceOrReconPath(relativePath);
     });
 
     // Rebuild HTML with proper structure
@@ -197,7 +210,7 @@ export async function cleanupMedusaCoverageReport(content: string): Promise<stri
         const sourceDivs = document.querySelectorAll('div.source-file');
         sourceDivs.forEach(div => {
             const filePath = div.getAttribute('data-file-path') || '';
-            const shouldRemove = !(filePath.startsWith(`${srcDirectory}/`) || filePath.includes('/recon'));
+            const shouldRemove = !isSourceOrReconPath(filePath);
             if (shouldRemove) {
                 div.remove();
             }
@@ -222,7 +235,7 @@ export async function cleanupMedusaCoverageReport(content: string): Promise<stri
             const containerDiv = button.nextElementSibling as HTMLElement;
 
             // Check if we should keep this entry
-            const shouldKeep = relativePath.startsWith(`${srcDirectory}/`) || relativePath.includes('/recon');
+            const shouldKeep = isSourceOrReconPath(relativePath);
 
             if (!shouldKeep) {
                 // Remove both button and container
